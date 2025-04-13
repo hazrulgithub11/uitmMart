@@ -134,6 +134,8 @@ const Threads: React.FC<ThreadsProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const animationFrameId = useRef<number | undefined>(undefined);
+  const currentMouseRef = useRef<[number, number]>([0.5, 0.5]);
+  const targetMouseRef = useRef<[number, number]>([0.5, 0.5]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -178,18 +180,17 @@ const Threads: React.FC<ThreadsProps> = ({
     window.addEventListener("resize", resize);
     resize();
 
-    let currentMouse = [0.5, 0.5];
-    let targetMouse = [0.5, 0.5];
-
     function handleMouseMove(e: MouseEvent) {
       const rect = container.getBoundingClientRect();
       const x = (e.clientX - rect.left) / rect.width;
       const y = 1.0 - (e.clientY - rect.top) / rect.height;
-      targetMouse = [x, y];
+      targetMouseRef.current = [x, y];
     }
+    
     function handleMouseLeave() {
-      targetMouse = [0.5, 0.5];
+      targetMouseRef.current = [0.5, 0.5];
     }
+    
     if (enableMouseInteraction) {
       container.addEventListener("mousemove", handleMouseMove);
       container.addEventListener("mouseleave", handleMouseLeave);
@@ -198,10 +199,16 @@ const Threads: React.FC<ThreadsProps> = ({
     function update(t: number) {
       if (enableMouseInteraction) {
         const smoothing = 0.05;
-        currentMouse[0] += smoothing * (targetMouse[0] - currentMouse[0]);
-        currentMouse[1] += smoothing * (targetMouse[1] - currentMouse[1]);
-        program.uniforms.uMouse.value[0] = currentMouse[0];
-        program.uniforms.uMouse.value[1] = currentMouse[1];
+        const current = currentMouseRef.current;
+        const target = targetMouseRef.current;
+        
+        currentMouseRef.current = [
+          current[0] + smoothing * (target[0] - current[0]),
+          current[1] + smoothing * (target[1] - current[1])
+        ];
+        
+        program.uniforms.uMouse.value[0] = currentMouseRef.current[0];
+        program.uniforms.uMouse.value[1] = currentMouseRef.current[1];
       } else {
         program.uniforms.uMouse.value[0] = 0.5;
         program.uniforms.uMouse.value[1] = 0.5;
