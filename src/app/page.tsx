@@ -5,6 +5,7 @@ import Link from "next/link";
 import { DockDemo } from "@/components/ui/dock-demo";
 import { LampDemo } from "@/components/ui/lamp-demo";
 import { Button } from "@/components/ui/moving-border";
+import { TimelineDemo } from "@/components/ui/timeline-demo";
 
 export default function Home() {
   return (
@@ -61,7 +62,7 @@ export default function Home() {
           </div>
         </div>
         
-        <main className="container mx-auto px-4 pb-16 flex flex-col items-center justify-center text-center pt-8">
+        <main className="container mx-auto px-4 pb-24 flex flex-col items-center justify-center text-center pt-8">
           <div className="flex flex-col sm:flex-row gap-4 mt-6">
             <Button
               href="/shop"
@@ -109,6 +110,17 @@ export default function Home() {
                 Our team is always here to help you.
               </p>
             </div>
+          </div>
+          
+          {/* Project Timeline Section */}
+          <div className="w-full mt-32 mb-16">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl md:text-5xl font-bold mb-4">Our Journey</h2>
+              <p className="text-xl text-gray-300 max-w-3xl mx-auto">
+                Follow the story of how UiTMMart came to be and our ongoing mission to serve the UiTM community.
+              </p>
+            </div>
+            <TimelineDemo />
           </div>
         </main>
       </div>
