@@ -64,7 +64,6 @@ export default function Home() {
         <main className="container mx-auto px-4 pb-16 flex flex-col items-center justify-center text-center pt-8">
           <div className="flex flex-col sm:flex-row gap-4 mt-6">
             <Button
-              as={Link}
               href="/shop"
               containerClassName="w-auto h-auto"
               borderClassName="bg-[radial-gradient(var(--blue-500)_40%,transparent_60%)]"

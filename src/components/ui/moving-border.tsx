@@ -9,6 +9,19 @@ import {
 } from "framer-motion";
 import { useRef } from "react";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
+
+type ButtonComponentProps = {
+  borderRadius?: string;
+  children: React.ReactNode;
+  containerClassName?: string;
+  borderClassName?: string;
+  duration?: number;
+  className?: string;
+  href?: string;
+  as?: React.ElementType;
+} & React.ButtonHTMLAttributes<HTMLButtonElement> & 
+  React.AnchorHTMLAttributes<HTMLAnchorElement>;
 
 export function Button({
   borderRadius = "1.75rem",
@@ -18,27 +31,34 @@ export function Button({
   borderClassName,
   duration,
   className,
+  href,
   ...otherProps
-}: {
-  borderRadius?: string;
-  children: React.ReactNode;
-  as?: any;
-  containerClassName?: string;
-  borderClassName?: string;
-  duration?: number;
-  className?: string;
-  [key: string]: any;
-}) {
+}: ButtonComponentProps) {
+  // If href is provided and Component is not explicitly set, use Link
+  const isLink = href && Component === "button";
+  const Comp = isLink ? Link : Component;
+
+  const buttonProps = {
+    ...otherProps,
+    ...(href && { href }),
+    className: cn(
+      "relative bg-slate-900/[0.8] border border-slate-800 backdrop-blur-xl text-white flex items-center justify-center w-full h-full text-sm antialiased",
+      className
+    ),
+    style: {
+      borderRadius: `calc(${borderRadius} * 0.96)`,
+    }
+  };
+
   return (
-    <Component
+    <div
       className={cn(
-        "bg-transparent relative text-xl  h-16 w-40 p-[1px] overflow-hidden ",
+        "bg-transparent relative text-xl h-16 w-40 p-[1px] overflow-hidden",
         containerClassName
       )}
       style={{
         borderRadius: borderRadius,
       }}
-      {...otherProps}
     >
       <div
         className="absolute inset-0"
@@ -54,20 +74,19 @@ export function Button({
         </MovingBorder>
       </div>
 
-      <div
-        className={cn(
-          "relative bg-slate-900/[0.8] border border-slate-800 backdrop-blur-xl text-white flex items-center justify-center w-full h-full text-sm antialiased",
-          className
-        )}
-        style={{
-          borderRadius: `calc(${borderRadius} * 0.96)`,
-        }}
-      >
+      <Comp {...buttonProps}>
         {children}
-      </div>
-    </Component>
+      </Comp>
+    </div>
   );
 }
+
+type MovingBorderProps = {
+  children: React.ReactNode;
+  duration?: number;
+  rx?: string;
+  ry?: string;
+} & React.SVGAttributes<SVGSVGElement>;
 
 export const MovingBorder = ({
   children,
@@ -75,14 +94,8 @@ export const MovingBorder = ({
   rx,
   ry,
   ...otherProps
-}: {
-  children: React.ReactNode;
-  duration?: number;
-  rx?: string;
-  ry?: string;
-  [key: string]: any;
-}) => {
-  const pathRef = useRef<any>();
+}: MovingBorderProps) => {
+  const pathRef = useRef<SVGRectElement | null>(null);
   const progress = useMotionValue<number>(0);
 
   useAnimationFrame((time) => {
