@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { DockDemo } from "@/components/ui/dock-demo";
 import { LampDemo } from "@/components/ui/lamp-demo";
+import { Button } from "@/components/ui/moving-border";
 
 export default function Home() {
   return (
@@ -62,12 +63,15 @@ export default function Home() {
         
         <main className="container mx-auto px-4 pb-16 flex flex-col items-center justify-center text-center pt-8">
           <div className="flex flex-col sm:flex-row gap-4 mt-6">
-            <Link
+            <Button
+              as={Link}
               href="/shop"
-              className="rounded-full bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg font-medium transition-colors"
+              containerClassName="w-auto h-auto"
+              borderClassName="bg-[radial-gradient(var(--blue-500)_40%,transparent_60%)]"
+              className="rounded-full bg-blue-600 hover:bg-blue-700 border-blue-500/20 text-white px-8 py-3 text-lg font-medium transition-colors"
             >
               Start Shopping
-            </Link>
+            </Button>
             <Link
               href="/about"
               className="rounded-full border border-white/20 hover:bg-white/10 text-white px-8 py-3 text-lg font-medium transition-colors"
