@@ -21,13 +21,17 @@ export function NavBar({ items, className }: NavBarProps) {
   const [activeTab, setActiveTab] = useState(items[0].name)
 
   return (
-    <div
+    <nav 
       className={cn(
-        "fixed bottom-0 sm:top-0 left-1/2 -translate-x-1/2 z-50 mb-6 sm:pt-6",
-        className,
+        "fixed top-0 left-0 right-0 flex justify-center z-10 pt-6",
+        className
       )}
+      style={{ pointerEvents: "none" }}
     >
-      <div className="flex items-center gap-3 bg-black/95 border border-zinc-800 backdrop-blur-lg py-2 px-2 rounded-full shadow-lg">
+      <div 
+        className="flex items-center gap-3 bg-black/95 border border-zinc-800 backdrop-blur-lg py-2 px-2 rounded-full shadow-lg"
+        style={{ pointerEvents: "auto" }}
+      >
         {items.map((item) => {
           const Icon = item.icon
           const isActive = activeTab === item.name
@@ -68,6 +72,6 @@ export function NavBar({ items, className }: NavBarProps) {
           )
         })}
       </div>
-    </div>
+    </nav>
   )
 } 

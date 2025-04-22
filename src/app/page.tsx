@@ -18,7 +18,7 @@ export default function Home() {
           <div className="flex items-center gap-2">
             <div className="relative w-8 h-8">
               <Image
-                src="/images/logo3.png"
+                src="/images/logo2.png"
                 alt="UiTMMart Logo"
                 width={32}
                 height={32}
