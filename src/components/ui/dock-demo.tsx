@@ -20,7 +20,7 @@ function DockDemo() {
     { 
       icon: ShoppingCart, 
       label: "Shop",
-      onClick: () => router.push('/shop')
+      onClick: () => router.push('/main')
     },
     { 
       icon: User, 
