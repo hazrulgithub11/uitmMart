@@ -236,7 +236,11 @@ export default function MainPage() {
           
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {products.map((product) => (
-              <div key={product.id} className="bg-zinc-900 rounded-lg overflow-hidden shadow-md relative">
+              <a 
+                key={product.id} 
+                href={`/product/${product.id}`}
+                className="block bg-zinc-900 rounded-lg overflow-hidden shadow-md relative hover:shadow-xl transition-shadow"
+              >
                 {product.discount && (
                   <div className="absolute top-0 right-0 bg-red-500 text-white text-xs font-bold px-2 py-1 z-10">
                     -{product.discount}%
@@ -262,7 +266,7 @@ export default function MainPage() {
                     RM {product.price.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                 </div>
-              </div>
+              </a>
             ))}
           </div>
         </div>

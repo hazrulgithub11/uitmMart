@@ -72,4 +72,11 @@ export const products: Product[] = [
     image: '/images/placeholder.svg',
     cod: true
   }
-]; 
+];
+
+// Utility function to get a product by ID
+export function getProductById(id: number | string): Product | undefined {
+  // Convert string id to number if needed
+  const productId = typeof id === 'string' ? parseInt(id, 10) : id;
+  return products.find(product => product.id === productId);
+} 
