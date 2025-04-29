@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "../components/Threads.css";
+@import "./fonts.css";
 
 @layer base {
   :root {
@@ -53,5 +54,5 @@
 body {
   background-color: black;
   color: white;
-  font-family: var(--font-geist-sans), Arial, sans-serif;
+  font-family: 'Proto Mono', var(--font-geist-sans), Arial, sans-serif;
 }

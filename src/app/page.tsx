@@ -6,6 +6,7 @@ import { DockDemo } from "@/components/ui/dock-demo";
 import { LampDemo } from "@/components/ui/lamp-demo";
 import { Button } from "@/components/ui/moving-border";
 import { TimelineDemo } from "@/components/ui/timeline-demo";
+import DecryptedText from "@/components/DecryptedText";
 
 export default function Home() {
   return (
@@ -54,10 +55,26 @@ export default function Home() {
           <LampDemo />
           <div className="absolute w-full bottom-[15%] left-0 right-0 z-50 text-center">
             <h1 className="text-4xl md:text-6xl font-bold mb-2 text-white">
-              Welcome to UiTMMart
+              <DecryptedText 
+                text="Welcome to UiTMMart" 
+                animateOn="view"
+                sequential={true}
+                maxIterations={15}
+                speed={40}
+                className="text-white"
+                encryptedClassName="text-blue-400"
+              />
             </h1>
             <p className="text-xl md:text-2xl mb-8 max-w-3xl mx-auto text-white/90">
-              Built for students. Trusted by thousands.
+              <DecryptedText
+                text="Built for students. Trusted by thousands."
+                animateOn="view"
+                revealDirection="center"
+                sequential={true}
+                speed={60}
+                className="text-white/90"
+                encryptedClassName="text-blue-300/80"
+              />
             </p>
           </div>
         </div>

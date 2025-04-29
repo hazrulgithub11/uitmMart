@@ -5,6 +5,7 @@ import { Home, Search, Bell, User, ShoppingCart, BookOpen, PenTool, FileText, La
          GraduationCap, FileCode, Gamepad, Headphones, ChevronRight, ChevronLeft } from 'lucide-react'
 import { NavBar } from "@/components/ui/tubelight-navbar"
 import Image from 'next/image'
+import { products } from '@/data/products'
 
 
 export default function MainPage() {
@@ -44,7 +45,7 @@ export default function MainPage() {
     { name: 'Board Games', icon: Gamepad },
     { name: 'Tech Gadgets', icon: Headphones },
   ]
-
+  
   return (
     <div className="min-h-screen bg-zinc-950">
       {/* Navigation bar */}
@@ -221,6 +222,48 @@ export default function MainPage() {
                 );
               })}
             </div>
+          </div>
+        </div>
+        
+        {/* Product Showcase Section */}
+        <div className="mb-8">
+          <div className="flex flex-col items-center mb-6">
+            <h2 className="text-xl font-semibold text-white mb-2">DAILY DISCOVER</h2>
+            <div className="w-32 h-0.5 bg-blue-500 relative">
+              <div className="absolute inset-0 bg-blue-500 blur-sm"></div>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {products.map((product) => (
+              <div key={product.id} className="bg-zinc-900 rounded-lg overflow-hidden shadow-md relative">
+                {product.discount && (
+                  <div className="absolute top-0 right-0 bg-red-500 text-white text-xs font-bold px-2 py-1 z-10">
+                    -{product.discount}%
+                  </div>
+                )}
+                <div className="w-full h-40 overflow-hidden">
+                  <Image
+                    src={product.image}
+                    alt={product.title}
+                    width={200}
+                    height={160}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="p-3">
+                  <h3 className="text-sm text-white font-medium truncate">{product.title}</h3>
+                  <div className="flex items-center gap-1 mt-1">
+                    {product.cod && (
+                      <div className="bg-blue-500 text-white text-xs px-2 rounded">COD</div>
+                    )}
+                  </div>
+                  <div className="mt-1 text-white font-semibold">
+                    RM {product.price.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
         

@@ -1,0 +1,14 @@
+@font-face {
+  font-family: 'Proto Mono';
+  src: local('Proto Mono Light'), local('Proto-Mono-Light'),
+      url('/fonts/ProtoMono-Light.woff2') format('woff2'),
+      url('/fonts/ProtoMono-Light.woff') format('woff'),
+      url('/fonts/ProtoMono-Light.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+}
+
+/* Apply the font to the root element */
+:root {
+  font-family: 'Proto Mono', monospace;
+} 
