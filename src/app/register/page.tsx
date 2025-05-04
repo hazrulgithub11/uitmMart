@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
@@ -9,57 +9,46 @@ import { useRouter } from 'next/navigation';
 // Use dynamic import with no SSR for the Threads component since it uses browser APIs
 const Threads = dynamic(() => import('@/components/Threads'), { ssr: false });
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter();
-  const [login, setLogin] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showAnimation, setShowAnimation] = useState(false);
-  const [animationStep, setAnimationStep] = useState(0);
-  const audioRef = useRef<HTMLAudioElement>(null);
-
-  // Animation sequence effect
-  useEffect(() => {
-    if (showAnimation) {
-      // Play sound effect when animation starts
-      if (audioRef.current) {
-        audioRef.current.volume = 0.5;
-        audioRef.current.play().catch(err => console.error("Audio play failed:", err));
-      }
-
-      // Animation sequence timing
-      const step1 = setTimeout(() => setAnimationStep(1), 500); // Show welcome text
-      const step2 = setTimeout(() => setAnimationStep(2), 2500); // Show logo
-      const step3 = setTimeout(() => {
-        // Redirect after animation completes
-        router.push('/main');
-      }, 4500);
-
-      return () => {
-        clearTimeout(step1);
-        clearTimeout(step2);
-        clearTimeout(step3);
-      };
-    }
-  }, [showAnimation, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Reset error
+    // Reset error state
     setError('');
+    
+    // Validate passwords match
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+    
+    // Validate password strength
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return;
+    }
     
     try {
       setLoading(true);
       
-      const response = await fetch('/api/login', {
+      const response = await fetch('/api/users', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          login,
+          fullName,
+          email,
+          username,
           password,
         }),
       });
@@ -67,46 +56,19 @@ export default function LoginPage() {
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error || 'Login failed');
+        throw new Error(data.error || 'Registration failed');
       }
       
-      // Login successful - start animation
-      console.log('Login successful:', data.user);
-      setShowAnimation(true);
+      // Registration successful - redirect to login page
+      alert('Registration successful! Please log in.');
+      router.push('/login');
       
     } catch (err: Error | unknown) {
-      setError(err instanceof Error ? err.message : 'Authentication failed. Please try again.');
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+    } finally {
       setLoading(false);
     }
   };
-
-  // If animation is active, show the animation screen
-  if (showAnimation) {
-    return (
-      <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-50">
-        {/* Audio element for sound effect */}
-        <audio ref={audioRef} src="/sounds/welcome.mp3" />
-        
-        {/* Welcome text - appears in step 1 */}
-        <div className={`transition-opacity duration-1000 ${animationStep >= 1 ? 'opacity-100' : 'opacity-0'}`}>
-          <h1 className="text-white text-4xl md:text-6xl font-bold mb-8 text-center">
-            WELCOME TO UITM MART
-          </h1>
-        </div>
-        
-        {/* Logo - appears in step 2 */}
-        <div className={`transition-all duration-1000 transform ${animationStep >= 2 ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`}>
-          <Image 
-            src="/images/logo2.png"
-            alt="UiTMMart Logo" 
-            width={300} 
-            height={300}
-            priority
-          />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen w-full relative bg-black flex items-center justify-center p-4">
@@ -135,15 +97,15 @@ export default function LoginPage() {
               />
             </div>
             
-            <p className="text-lg md:text-xl text-center">Built for students. Trusted by thousands.</p>
+            <p className="text-lg md:text-xl text-center">Join the community of UiTM students buying and selling online.</p>
           </div>
         </div>
 
-        {/* Right side with login form */}
+        {/* Right side with registration form */}
         <div className="w-full md:w-1/2 flex justify-center items-center p-4 md:p-8">
           <div className="w-full max-w-md">
             <div className="bg-white/90 backdrop-blur-sm p-6 md:p-8 rounded-lg shadow-lg">
-              <h2 className="text-2xl font-semibold mb-6 text-black">Log In</h2>
+              <h2 className="text-2xl font-semibold mb-6 text-black">Create Account</h2>
               
               {error && (
                 <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
@@ -155,10 +117,34 @@ export default function LoginPage() {
                 <div className="mb-4">
                   <input
                     type="text"
-                    placeholder="Username / Email"
+                    placeholder="Full Name"
                     className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-600 text-black"
-                    value={login}
-                    onChange={(e) => setLogin(e.target.value)}
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required
+                    disabled={loading}
+                  />
+                </div>
+                
+                <div className="mb-4">
+                  <input
+                    type="email"
+                    placeholder="Email Address"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-600 text-black"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    disabled={loading}
+                  />
+                </div>
+                
+                <div className="mb-4">
+                  <input
+                    type="text"
+                    placeholder="Username"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-600 text-black"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
                     required
                     disabled={loading}
                   />
@@ -176,20 +162,26 @@ export default function LoginPage() {
                   />
                 </div>
                 
+                <div className="mb-6">
+                  <input
+                    type="password"
+                    placeholder="Confirm Password"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-600 text-black"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    disabled={loading}
+                  />
+                </div>
+                
                 <button
                   type="submit"
                   className="w-full bg-blue-700 text-white py-2 rounded uppercase font-medium hover:bg-blue-800 transition-colors disabled:bg-blue-400"
                   disabled={loading}
                 >
-                  {loading ? 'LOGGING IN...' : 'LOG IN'}
+                  {loading ? 'REGISTERING...' : 'REGISTER'}
                 </button>
               </form>
-              
-              <div className="mt-4 text-center">
-                <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">
-                  Forgot Password
-                </Link>
-              </div>
               
               <div className="my-6 flex items-center justify-between">
                 <hr className="w-5/12 border-gray-300" />
@@ -220,13 +212,13 @@ export default function LoginPage() {
                   />
                   <path d="M1 1h22v22H1z" fill="none" />
                 </svg>
-                <span>Google</span>
+                <span>Sign up with Google</span>
               </button>
               
               <div className="mt-6 text-center text-sm">
-                <span className="text-gray-600">New to UitmMart?</span>{' '}
-                <Link href="/register" className="text-blue-600 font-medium hover:underline">
-                  Sign Up
+                <span className="text-gray-600">Already have an account?</span>{' '}
+                <Link href="/login" className="text-blue-600 font-medium hover:underline">
+                  Log In
                 </Link>
               </div>
             </div>
