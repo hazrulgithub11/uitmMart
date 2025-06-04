@@ -1,33 +1,60 @@
 "use client"
 
-import { useState } from 'react'
-import { Home, Search, Bell, User, ShoppingCart, MapPin, X, AlertCircle, ChevronDown, Store, MessageCircle } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Home, Search, Bell, User, ShoppingCart, MapPin, X, Store, MessageCircle } from 'lucide-react'
 import { NavBar } from "@/components/ui/tubelight-navbar"
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
+import { toast } from 'react-hot-toast'
+
+// Cartoon UI Style
+const cartoonStyle = {
+  card: "bg-white border-4 border-black rounded-2xl shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] p-6 transition-all hover:shadow-[12px_12px_0px_0px_rgba(0,0,0,0.8)]", 
+  button: "bg-white border-3 border-black rounded-lg shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,0.8)] transition-all active:translate-y-1 active:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]",
+  buttonSuccess: "bg-emerald-500 text-white border-3 border-black rounded-lg shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,0.8)] transition-all active:translate-y-1 active:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]",
+  buttonPrimary: "bg-blue-500 text-white border-3 border-black rounded-lg shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,0.8)] transition-all active:translate-y-1 active:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]",
+  buttonDanger: "bg-red-500 text-white border-3 border-black rounded-lg shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,0.8)] transition-all active:translate-y-1 active:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]",
+  input: "bg-white border-3 border-black rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+};
 
 // Define an interface for address data
 interface AddressData {
   id: number
-  name: string
-  phone: string
-  state: string
-  area: string
-  district: string
-  postalCode: string
-  unit: string
-  addressLine: string
+  recipientName: string
+  phoneNumber: string
   addressLine1: string
-  addressLine2: string
-  addressLine3: string
-  isDefault?: boolean
-  isPickupAddress?: boolean
-  needsUpdate?: boolean
+  addressLine2?: string
+  city: string
+  state: string
+  postalCode: string
+  country: string
+  isDefault: boolean
+  latitude?: number
+  longitude?: number
+}
+
+// Define an interface for checkout items
+interface CheckoutItem {
+  id: number
+  productId: number
+  quantity: number
+  variation?: string
+  product: {
+    price: number | string
+    name: string
+    images?: string[]
+    shop: {
+      id: number
+      name: string
+    }
+  }
 }
 
 export default function CheckoutPage() {
   const router = useRouter()
+  const { status } = useSession()
   const navItems = [
     { name: 'Home', url: '/main', icon: Home },
     { name: 'Search', url: '/search', icon: Search },
@@ -35,154 +62,256 @@ export default function CheckoutPage() {
     { name: 'Profile', url: '/profile', icon: User }
   ]
   
-  // Mock user addresses data
-  const userAddresses = [
-    {
-      id: 1,
-      name: "HAZRUL FAHMI",
-      phone: "(+60) 11 6936 3271",
-      state: "Melaka",
-      area: "Jasin",
-      district: "Semujok",
-      postalCode: "77300",
-      unit: "",
-      addressLine: "Lot 2554-1, Kampung Seri Mendapat, Semujuk,7300 Merlimau, Melaka",
-      addressLine1: "Lot 2554-1, Kampung Seri Mendapat, Semujuk,7300",
-      addressLine2: "Merlimau, Melaka",
-      addressLine3: "Jasin, Melaka, 77300",
-      isDefault: true
-    },
-    {
-      id: 2,
-      name: "Muhammad Hazrul Fahmi Bin ...",
-      phone: "(+60) 11 6936 3271",
-      state: "Johor",
-      area: "Batu Pahat",
-      district: "Semerah",
-      postalCode: "83600",
-      unit: "",
-      addressLine: "POS 244,KAMPUNG SARANG BUAYA DARAT",
-      addressLine1: "POS 244,KAMPUNG SARANG BUAYA DARAT,83600",
-      addressLine2: "SEMERAH,BATU PAHAT,JOHOR.",
-      addressLine3: "Batu Pahat, Johor, 83600",
-      isPickupAddress: true,
-      needsUpdate: true
-    },
-    {
-      id: 3,
-      name: "MUHAMMAD HAZRUL FAHMI",
-      phone: "(+60) 11 6936 3271",
-      state: "W.P. Putrajaya",
-      area: "Putrajaya",
-      district: "Presint 11",
-      postalCode: "62300",
-      unit: "C-6-15",
-      addressLine: "Apartment Prima, Jalan P11e/5, Presint 11",
-      addressLine1: "C-6-15 , Apartment Prima, Jalan P11e/5, Presint 11, 62300,",
-      addressLine2: "Putrajaya",
-      addressLine3: "W.P. Putrajaya, W.P. Putrajaya, 62300"
-    }
-  ]
+  // State for addresses
+  const [addresses, setAddresses] = useState<AddressData[]>([])
+  const [loadingAddresses, setLoadingAddresses] = useState(true)
+  const [addressError, setAddressError] = useState<string | null>(null)
   
-  // Mock product data
-  const orderedProducts = [
-    {
-      id: 1,
-      name: "Jacket Mmxxiv JACKET HIGH CLUB Bordeaux red",
-      shopName: "highclubsgclok8.my",
-      price: 134.75,
-      quantity: 1,
-      variation: "Red BORDEAUX,M",
-      image: "/images/jacket-bordeaux.jpg"
-    },
-    {
-      id: 2,
-      shopName: "teknomobile.my",
-      name: "Samsung Galaxy S23 Ultra 12GB+256GB",
-      price: 4599.00,
-      quantity: 1,
-      variation: "Cream",
-      image: "/images/placeholder.png"
-    }
-  ]
+  // State for checkout products
+  const [checkoutItems, setCheckoutItems] = useState<CheckoutItem[]>([])
+  const [loadingItems, setLoadingItems] = useState(true)
   
   // States for modals and selections
-  const [selectedAddressId, setSelectedAddressId] = useState(1)
+  const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null)
   const [showAddressModal, setShowAddressModal] = useState(false)
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [tempSelectedAddressId, setTempSelectedAddressId] = useState(1)
-  const [addressToEdit, setAddressToEdit] = useState<AddressData | null>(null)
-  const [editFormData, setEditFormData] = useState({
-    name: "",
-    phone: "",
-    state: "",
-    postalCode: "",
-    unit: "",
-    addressLine: ""
-  })
+  const [tempSelectedAddressId, setTempSelectedAddressId] = useState<number | null>(null)
+  
+  
+  // States for placing order
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  // Function to fetch addresses from API
+  const fetchAddresses = async () => {
+    try {
+      setLoadingAddresses(true)
+      setAddressError(null)
+      
+      const response = await fetch('/api/addresses')
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch addresses')
+      }
+      
+      const data = await response.json()
+      setAddresses(data)
+      
+      // Set the default address as selected, or the first address if no default
+      const defaultAddress = data.find((addr: AddressData) => addr.isDefault)
+      if (defaultAddress) {
+        setSelectedAddressId(defaultAddress.id)
+        setTempSelectedAddressId(defaultAddress.id)
+      } else if (data.length > 0) {
+        setSelectedAddressId(data[0].id)
+        setTempSelectedAddressId(data[0].id)
+      }
+    } catch (error) {
+      console.error('Error fetching addresses:', error)
+      setAddressError(error instanceof Error ? error.message : 'Failed to load addresses')
+    } finally {
+      setLoadingAddresses(false)
+    }
+  }
+  
+  // Function to fetch checkout items from sessionStorage
+  const fetchCheckoutItems = useCallback(() => {
+    try {
+      setLoadingItems(true)
+      
+      // Check if we're in a browser environment
+      if (typeof window !== 'undefined') {
+        const storedItems = sessionStorage.getItem('checkoutItems')
+        
+        if (storedItems) {
+          const parsedItems = JSON.parse(storedItems)
+          setCheckoutItems(parsedItems)
+        } else {
+          // If no items in sessionStorage, redirect back to cart
+          router.push('/cart')
+          toast.error('No items selected for checkout')
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching checkout items:', error)
+      toast.error('Failed to load checkout items')
+    } finally {
+      setLoadingItems(false)
+    }
+  }, [router])
+  
+  // Fetch addresses and checkout items when component mounts
+  useEffect(() => {
+    if (status === 'authenticated') {
+      fetchAddresses()
+      fetchCheckoutItems()
+    } else if (status === 'unauthenticated') {
+      router.push('/login?callbackUrl=/checkout')
+    }
+  }, [status, router, fetchCheckoutItems])
+  
+  // Calculate total price for items
+  const calculateSubtotal = () => {
+    return checkoutItems.reduce((sum, item) => {
+      const price = typeof item.product.price === 'number' 
+        ? item.product.price 
+        : parseFloat(String(item.product.price))
+      return sum + (price * item.quantity)
+    }, 0).toFixed(2)
+  }
+  
+  // Calculate shipping fee (simplified for demo)
+  const shippingFee = 10.00
+  
+  // Calculate total price
+  const calculateTotal = () => {
+    const subtotal = parseFloat(calculateSubtotal())
+    return (subtotal + shippingFee).toFixed(2)
+  }
   
   // Get the current selected address
-  const selectedAddress = userAddresses.find(addr => addr.id === selectedAddressId)
+  const selectedAddress = selectedAddressId 
+    ? addresses.find(addr => addr.id === selectedAddressId) 
+    : null
+  
+  // Format address for display
+  const formatAddressLine = (address: AddressData | null) => {
+    if (!address) return []
+    
+    const lines = []
+    lines.push(address.addressLine1)
+    if (address.addressLine2) lines.push(address.addressLine2)
+    lines.push(`${address.city}, ${address.state}, ${address.postalCode}`)
+    lines.push(address.country)
+    
+    return lines
+  }
   
   // Toggle address modal
   const toggleAddressModal = () => {
     setShowAddressModal(!showAddressModal)
     // Reset temp selection to current selection when opening
-    if (!showAddressModal) {
+    if (!showAddressModal && selectedAddressId) {
       setTempSelectedAddressId(selectedAddressId)
     }
   }
   
   // Confirm address selection
   const confirmAddressSelection = () => {
+    if (tempSelectedAddressId) {
     setSelectedAddressId(tempSelectedAddressId)
+    }
     setShowAddressModal(false)
   }
   
-  // Open edit address modal
-  const openEditModal = (address: AddressData) => {
-    setAddressToEdit(address)
-    setEditFormData({
-      name: address.name,
-      phone: address.phone,
-      state: `${address.state}, ${address.area}, ${address.district}`,
-      postalCode: address.postalCode,
-      unit: address.unit || "",
-      addressLine: address.addressLine
-    })
-    setShowEditModal(true)
-  }
+
   
-  // Close edit address modal
-  const closeEditModal = () => {
-    setShowEditModal(false)
-    setAddressToEdit(null)
-  }
   
-  // Handle form input changes
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setEditFormData({
-      ...editFormData,
-      [name]: value
-    })
-  }
+ 
   
-  // Handle form submission
-  const handleSubmitEdit = (e: React.FormEvent) => {
-    e.preventDefault()
-    // In a real app, you would save the changes to the database
-    // For this demo, we'll just close the modal
-    closeEditModal()
+  
+  
+  
+  // Navigate to chat page
+  const navigateToChat = (shopId: number) => {
+    router.push(`/chat?shop=${encodeURIComponent(shopId.toString())}`)
   }
 
-  // Navigate to chat page
-  const navigateToChat = (shopName: string) => {
-    router.push(`/chat?shop=${encodeURIComponent(shopName)}`)
+  // Navigate to shop page
+  const navigateToShop = (shopId: number) => {
+    router.push(`/shop/${shopId}`)
+  }
+  
+  // Navigate to add new address page
+  const navigateToAddAddress = () => {
+    router.push('/profile/addresses')
+  }
+
+  // Handle placing order
+  const handlePlaceOrder = async () => {
+    if (!selectedAddress) {
+      toast.error('Please select a delivery address');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      // Create checkout session with Stripe
+      const response = await fetch('/api/checkout/payment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: checkoutItems.map(item => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            variation: item.variation
+          })),
+          addressId: selectedAddress.id
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create checkout session');
+      }
+
+      // Redirect to Stripe checkout
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL returned');
+      }
+    } catch (error) {
+      console.error('Checkout error:', error);
+      toast.error(error instanceof Error ? error.message : 'An error occurred during checkout');
+      setIsSubmitting(false);
+    }
+  }
+
+  // Loading state for addresses or items
+  if (loadingAddresses || loadingItems) {
+    return (
+      <div className="min-h-screen bg-[url('/images/backuitm.png')] bg-cover bg-center">
+        <div className="pt-32 px-4 mx-auto max-w-4xl">
+          <div className={`${cartoonStyle.card} mb-6`}>
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-black mb-4"></div>
+              <p className="text-black font-bold">Loading checkout information...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // If no checkout items, show error
+  if (checkoutItems.length === 0) {
+    return (
+      <div className="min-h-screen bg-[url('/images/backuitm.png')] bg-cover bg-center">
+        <NavBar items={navItems} />
+        <div className="pt-32 px-4 mx-auto max-w-4xl">
+          <div className={`${cartoonStyle.card} mb-6`}>
+            <div className="flex flex-col items-center justify-center py-12">
+              <ShoppingCart className="h-16 w-16 text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-800 mb-2">No items selected for checkout</h3>
+              <p className="text-gray-600 mb-6">Go back to your cart and select items for checkout.</p>
+              <button 
+                onClick={() => router.push('/cart')}
+                className={`${cartoonStyle.buttonPrimary} px-6 py-2 font-medium`}
+              >
+                Return to Cart
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950">
+    <div className="min-h-screen bg-[url('/images/backuitm.png')] bg-repeat bg-auto pb-20">
       {/* Navigation bar */}
       <NavBar items={navItems} />
       
@@ -197,7 +326,7 @@ export default function CheckoutPage() {
               alt="Logo" 
               width={40} 
               height={40}
-              className="rounded-full"
+              className="rounded-full border-3 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]"
             />
           </div>
           
@@ -209,71 +338,98 @@ export default function CheckoutPage() {
             <input
               type="text"
               placeholder="Search..."
-              className="w-full py-2 pl-10 pr-4 rounded-full border border-zinc-700 bg-black text-white focus:outline-none focus:ring-2 focus:ring-zinc-600"
+              className={`${cartoonStyle.input} w-full py-2 pl-10 pr-4 text-black`}
             />
           </div>
           
           {/* Cart icon on the right */}
           <div className="flex-shrink-0">
             <Link href="/cart">
-              <button className="p-2 rounded-full bg-zinc-800 hover:bg-zinc-700 transition-colors">
-                <ShoppingCart className="h-5 w-5 text-white" />
+              <button className={`${cartoonStyle.button} p-2 rounded-full text-black`}>
+                <ShoppingCart className="h-5 w-5" />
               </button>
             </Link>
           </div>
         </div>
 
         {/* Checkout Page Content */}
-        <div className="text-white">
+        <div className="text-black">
           <h1 className="text-2xl font-bold mb-6">Checkout</h1>
           
           {/* Delivery Address Section */}
-          <div className="bg-zinc-900 rounded-xl p-6 mb-6">
+          <div className={`${cartoonStyle.card} mb-6 bg-blue-50`}>
             <div className="flex items-center gap-2 mb-4">
               <MapPin className="text-red-500" size={20} />
-              <h2 className="text-lg font-medium text-white">Delivery Address</h2>
+              <h2 className="text-lg font-medium text-black">Delivery Address</h2>
             </div>
             
+            {addressError ? (
+              <div className="bg-red-50 border-2 border-red-500 rounded-lg p-4 mb-4">
+                <p className="text-red-700">Error loading addresses: {addressError}</p>
+                <button 
+                  onClick={fetchAddresses}
+                  className={`${cartoonStyle.buttonPrimary} mt-2 px-4 py-1 text-sm`}
+                >
+                  Try Again
+                </button>
+              </div>
+            ) : addresses.length === 0 ? (
+              <div className="bg-yellow-50 border-2 border-yellow-500 rounded-lg p-4 mb-4">
+                <p className="text-yellow-700">You don&apos;t have any saved addresses.</p>
+                <button 
+                  onClick={navigateToAddAddress}
+                  className={`${cartoonStyle.buttonPrimary} mt-2 px-4 py-1 text-sm`}
+                >
+                  Add Address
+                </button>
+              </div>
+            ) : selectedAddress ? (
             <div className="flex justify-between items-start">
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="font-medium">{selectedAddress?.name}</p>
-                  <p className="text-zinc-400">({selectedAddress?.phone})</p>
+                    <p className="font-medium">{selectedAddress.recipientName}</p>
+                    <p className="text-gray-600">({selectedAddress.phoneNumber})</p>
                 </div>
-                <p className="text-zinc-300 mt-1">{selectedAddress?.addressLine1}</p>
-                <p className="text-zinc-300">{selectedAddress?.addressLine2}</p>
-                <p className="text-zinc-300">{selectedAddress?.addressLine3}</p>
+                  {formatAddressLine(selectedAddress).map((line, index) => (
+                    <p key={index} className="text-gray-700">{line}</p>
+                  ))}
               </div>
               
               <div className="flex items-center gap-3">
-                {selectedAddress?.isDefault && (
-                  <span className="text-xs border border-red-500 text-red-500 px-2 py-1 rounded">
+                  {selectedAddress.isDefault && (
+                    <span className="text-xs border-2 border-red-500 text-red-500 px-2 py-1 rounded bg-white">
                     Default
                   </span>
                 )}
-                {selectedAddress?.isPickupAddress && (
-                  <span className="text-xs border border-zinc-500 text-zinc-300 px-2 py-1 rounded">
-                    Pickup Address
-                  </span>
-                )}
+                  <button 
+                    className={`${cartoonStyle.buttonPrimary} px-3 py-1 text-sm`}
+                    onClick={toggleAddressModal}
+                  >
+                    Change
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-yellow-50 border-2 border-yellow-500 rounded-lg p-4 mb-4">
+                <p className="text-yellow-700">Please select a delivery address.</p>
                 <button 
-                  className="text-blue-400 hover:text-blue-300"
                   onClick={toggleAddressModal}
+                  className={`${cartoonStyle.buttonPrimary} mt-2 px-4 py-1 text-sm`}
                 >
-                  Change
+                  Select Address
                 </button>
               </div>
-            </div>
+            )}
           </div>
           
           {/* Products Ordered Section */}
-          <div className="bg-zinc-900 rounded-xl overflow-hidden mb-6">
-            <div className="p-6 pb-3">
-              <h2 className="text-lg font-medium text-white mb-2">Products Ordered</h2>
+          <div className={`${cartoonStyle.card} mb-6 overflow-hidden`}>
+            <div className="pb-3">
+              <h2 className="text-lg font-medium text-black mb-2">Products Ordered</h2>
             </div>
             
             {/* Table headers */}
-            <div className="hidden md:grid grid-cols-12 py-3 px-6 border-b border-zinc-800 text-zinc-400 text-sm">
+            <div className="hidden md:grid grid-cols-12 py-3 px-6 border-b-3 border-black text-gray-700 text-sm bg-gray-100">
               <div className="col-span-6">Products Ordered</div>
               <div className="col-span-2 text-right">Unit Price</div>
               <div className="col-span-2 text-center">Amount</div>
@@ -281,18 +437,34 @@ export default function CheckoutPage() {
             </div>
             
             {/* Products List */}
-            <div className="divide-y divide-zinc-800">
-              {orderedProducts.map((product) => (
-                <div key={product.id} className="p-6">
+            <div className="divide-y-3 divide-black">
+              {checkoutItems.map((item) => {
+                // Calculate safe price
+                const safePrice = typeof item.product.price === 'number' 
+                  ? item.product.price 
+                  : parseFloat(String(item.product.price))
+                  
+                // Get product image
+                const productImage = item.product.images && item.product.images.length > 0 
+                  ? item.product.images[0] 
+                  : "/images/placeholder.svg"
+                  
+                return (
+                  <div key={item.id} className="p-6">
                   {/* Shop name with chat button */}
                   <div className="flex items-center gap-3 mb-3">
                     <div className="flex items-center">
-                      <Store className="h-4 w-4 text-zinc-400 mr-2" />
-                      <span className="text-zinc-300 text-sm">{product.shopName}</span>
+                        <Store className="h-4 w-4 text-blue-600 mr-2" />
+                        <span 
+                          className="text-black text-sm font-bold cursor-pointer hover:text-blue-600"
+                          onClick={() => navigateToShop(item.product.shop.id)}
+                        >
+                          {item.product.shop.name}
+                        </span>
                     </div>
                     <button 
-                      onClick={() => navigateToChat(product.shopName)}
-                      className="text-green-500 hover:text-green-400 transition-colors flex items-center text-xs"
+                        onClick={() => navigateToChat(item.product.shop.id)}
+                        className="text-green-600 hover:text-green-400 transition-colors flex items-center text-xs"
                     >
                       <MessageCircle className="h-4 w-4 mr-1" />
                       chat now
@@ -303,61 +475,72 @@ export default function CheckoutPage() {
                   <div className="md:grid grid-cols-12 gap-4 items-center">
                     {/* Product info */}
                     <div className="col-span-6 flex gap-3 mb-4 md:mb-0">
-                      <div className="w-16 h-16 flex-shrink-0 rounded bg-zinc-800 overflow-hidden">
+                        <div 
+                          className="w-16 h-16 flex-shrink-0 rounded-md overflow-hidden border-3 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] cursor-pointer"
+                          onClick={() => router.push(`/product/${item.productId}`)}
+                        >
                         <Image 
-                          src={product.image} 
-                          alt={product.name}
+                            src={productImage}
+                            alt={item.product.name}
                           width={64}
                           height={64}
                           className="object-cover w-full h-full"
                         />
                       </div>
                       <div>
-                        <p className="text-white text-sm">{product.name}</p>
-                        <p className="text-zinc-500 text-xs mt-1">Variation: {product.variation}</p>
+                          <p 
+                            className="text-black text-sm cursor-pointer hover:text-blue-600"
+                            onClick={() => router.push(`/product/${item.productId}`)}
+                          >
+                            {item.product.name}
+                          </p>
+                          {item.variation && (
+                            <p className="text-gray-600 text-xs mt-1">Variation: {item.variation}</p>
+                          )}
                       </div>
                     </div>
                     
                     {/* Pricing */}
                     <div className="col-span-2 text-right">
-                      <div className="md:hidden text-zinc-400 text-xs mb-1">Unit Price</div>
-                      <p className="text-white">RM{product.price.toFixed(2)}</p>
+                        <div className="md:hidden text-gray-600 text-xs mb-1">Unit Price</div>
+                        <p className="text-black">RM{safePrice.toFixed(2)}</p>
                     </div>
                     
                     <div className="col-span-2 text-center">
-                      <div className="md:hidden text-zinc-400 text-xs mb-1">Amount</div>
-                      <p className="text-white">{product.quantity}</p>
+                        <div className="md:hidden text-gray-600 text-xs mb-1">Amount</div>
+                        <p className="text-black">{item.quantity}</p>
                     </div>
                     
                     <div className="col-span-2 text-right">
-                      <div className="md:hidden text-zinc-400 text-xs mb-1">Item Subtotal</div>
-                      <p className="text-white">RM{(product.price * product.quantity).toFixed(2)}</p>
+                        <div className="md:hidden text-gray-600 text-xs mb-1">Item Subtotal</div>
+                        <p className="text-red-500 font-bold">RM{(safePrice * item.quantity).toFixed(2)}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
           
           {/* Order Summary Section */}
-          <div className="bg-zinc-900 rounded-xl p-6 mb-6">
-            <h2 className="text-lg font-medium text-white mb-4">Order Summary</h2>
+          <div className={`${cartoonStyle.card} mb-6 bg-yellow-50`}>
+            <h2 className="text-lg font-medium text-black mb-4">Order Summary</h2>
             
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
-                <span className="text-zinc-400">Merchandise Subtotal</span>
-                <span className="text-white">RM{orderedProducts.reduce((sum, product) => sum + (product.price * product.quantity), 0).toFixed(2)}</span>
+                <span className="text-gray-700">Merchandise Subtotal</span>
+                <span className="text-black">RM{calculateSubtotal()}</span>
               </div>
               
               <div className="flex justify-between text-sm">
-                <span className="text-zinc-400">Shipping Fee</span>
-                <span className="text-white">RM10.00</span>
+                <span className="text-gray-700">Shipping Fee</span>
+                <span className="text-black">RM{shippingFee.toFixed(2)}</span>
               </div>
               
-              <div className="pt-3 border-t border-zinc-800 flex justify-between">
-                <span className="text-zinc-300">Total</span>
-                <span className="text-xl font-medium text-red-500">
-                  RM{(orderedProducts.reduce((sum, product) => sum + (product.price * product.quantity), 0) + 10).toFixed(2)}
+              <div className="pt-3 border-t-3 border-black flex justify-between">
+                <span className="text-black font-bold">Total</span>
+                <span className="text-xl font-bold text-red-500">
+                  RM{calculateTotal()}
                 </span>
               </div>
             </div>
@@ -365,23 +548,36 @@ export default function CheckoutPage() {
           
           {/* Place Order Button */}
           <div className="mb-20">
-            <button className="w-full bg-red-500 hover:bg-red-600 py-3 rounded-xl text-white font-medium transition-colors">
-              Place Order
+            <button 
+              className={`${cartoonStyle.buttonDanger} w-full py-3 text-white font-bold ${!selectedAddress || isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={!selectedAddress || isSubmitting}
+              onClick={handlePlaceOrder}
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent mr-2"></div>
+                  Processing...
+                </>
+              ) : (
+                'Place Order'
+              )}
             </button>
+            {!selectedAddress && (
+              <p className="text-red-500 text-center mt-2">Please select a delivery address to proceed</p>
+            )}
           </div>
         </div>
       </div>
       
       {/* Address Selection Modal */}
-      {showAddressModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-md overflow-hidden">
+      <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" style={{ display: showAddressModal ? 'flex' : 'none' }}>
+        <div className={`bg-white rounded-xl w-full max-w-md overflow-hidden border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]`}>
             {/* Modal Header */}
-            <div className="bg-white p-4 border-b border-gray-200 flex justify-between items-center">
-              <h3 className="text-lg font-medium text-gray-900">My Address</h3>
+          <div className="bg-blue-100 p-4 border-b-3 border-black flex justify-between items-center">
+            <h3 className="text-lg font-bold text-black">My Address</h3>
               <button 
                 onClick={toggleAddressModal}
-                className="text-gray-400 hover:text-gray-500"
+              className="text-black hover:text-red-500"
               >
                 <X size={20} />
               </button>
@@ -389,19 +585,30 @@ export default function CheckoutPage() {
             
             {/* Address List */}
             <div className="max-h-[60vh] overflow-y-auto">
-              {userAddresses.map((address) => (
+            {addresses.length === 0 ? (
+              <div className="p-8 text-center">
+                <p className="text-gray-600 mb-4">You don&apos;t have any saved addresses.</p>
+                <button 
+                  onClick={navigateToAddAddress}
+                  className={`${cartoonStyle.buttonPrimary} px-4 py-2`}
+                >
+                  Add New Address
+                </button>
+              </div>
+            ) : (
+              addresses.map((address) => (
                 <div 
                   key={address.id} 
-                  className="border-b border-gray-200 p-4"
+                  className="border-b-3 border-black p-4"
                 >
                   <div className="flex items-start gap-3">
                     {/* Radio Button */}
                     <div className="mt-1">
                       <button 
-                        className={`w-5 h-5 rounded-full border flex-shrink-0 ${
+                        className={`w-5 h-5 rounded-full border-3 flex-shrink-0 ${
                           tempSelectedAddressId === address.id 
-                            ? 'border-4 border-blue-500' 
-                            : 'border border-gray-400'
+                            ? 'border-blue-500 bg-blue-500' 
+                            : 'border-black bg-white'
                         }`}
                         onClick={() => setTempSelectedAddressId(address.id)}
                       ></button>
@@ -410,176 +617,52 @@ export default function CheckoutPage() {
                     {/* Address Info */}
                     <div className="flex-grow">
                       <div className="flex justify-between w-full">
-                        <p className="font-medium text-gray-900">{address.name}</p>
+                        <p className="font-bold text-black">{address.recipientName}</p>
                         <button 
-                          className="text-blue-500 text-sm"
-                          onClick={() => openEditModal(address)}
+                          className="text-blue-500 text-sm font-bold"
+                          onClick={() => navigateToAddAddress()}
                         >
                           Edit
                         </button>
                       </div>
-                      <p className="text-gray-600 text-sm mt-1">{address.phone}</p>
-                      <p className="text-gray-800 text-sm mt-2">{address.addressLine1}</p>
-                      <p className="text-gray-800 text-sm">{address.addressLine2}</p>
-                      <p className="text-gray-800 text-sm">{address.addressLine3}</p>
+                      <p className="text-gray-600 text-sm mt-1">{address.phoneNumber}</p>
+                      {formatAddressLine(address).map((line, index) => (
+                        <p key={index} className="text-black text-sm">{line}</p>
+                      ))}
                       
                       {/* Tags */}
                       <div className="mt-2">
                         {address.isDefault && (
-                          <span className="inline-block text-xs border border-red-500 text-red-500 px-2 py-0.5 rounded mr-2">
+                          <span className="inline-block text-xs border-2 border-red-500 text-red-500 px-2 py-0.5 rounded mr-2 bg-white">
                             Default
                           </span>
                         )}
-                        {address.isPickupAddress && (
-                          <span className="inline-block text-xs border border-gray-400 text-gray-700 px-2 py-0.5 rounded">
-                            Pickup Address
-                          </span>
-                        )}
                       </div>
-                      
-                      {/* Warning Message */}
-                      {address.needsUpdate && (
-                        <div className="mt-3 p-2 bg-yellow-50 rounded-md flex items-start gap-2">
-                          <AlertCircle size={16} className="text-yellow-600 flex-shrink-0 mt-0.5" />
-                          <p className="text-xs text-yellow-800">
-                            Some information may no longer up to date, please help us update this address.
-                          </p>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>
-              ))}
+              ))
+            )}
             </div>
             
             {/* Action Buttons */}
-            <div className="p-4 flex gap-3 border-t border-gray-200">
+          <div className="p-4 flex gap-3 border-t-3 border-black">
               <button 
                 onClick={toggleAddressModal}
-                className="flex-1 py-2 px-4 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              className={`${cartoonStyle.button} flex-1 py-2 px-4 text-black`}
               >
                 Cancel
               </button>
               <button 
                 onClick={confirmAddressSelection}
-                className="flex-1 py-2 px-4 bg-red-500 text-white rounded-md hover:bg-red-600"
+              className={`${cartoonStyle.buttonDanger} flex-1 py-2 px-4 text-white ${!tempSelectedAddressId ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={!tempSelectedAddressId}
               >
                 Confirm
               </button>
             </div>
           </div>
         </div>
-      )}
-      
-      {/* Edit Address Modal */}
-      {showEditModal && addressToEdit && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-md overflow-hidden">
-            {/* Modal Header */}
-            <div className="bg-white p-4 border-b border-gray-200 flex justify-between items-center">
-              <h3 className="text-lg font-medium text-gray-900">Edit Address</h3>
-              <button 
-                onClick={closeEditModal}
-                className="text-gray-400 hover:text-gray-500"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            
-            {/* Edit Form */}
-            <form onSubmit={handleSubmitEdit} className="p-4">
-              <div className="mb-4">
-                <label className="block text-gray-500 text-sm mb-1">Full Name</label>
-                <input
-                  type="text"
-                  name="name"
-                  value={editFormData.name}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded"
-                />
-              </div>
-              
-              <div className="mb-4">
-                <label className="block text-gray-500 text-sm mb-1">Phone Number</label>
-                <input
-                  type="text"
-                  name="phone"
-                  value={editFormData.phone}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded"
-                />
-              </div>
-              
-              <div className="mb-4">
-                <label className="block text-gray-500 text-sm mb-1">State, Area</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    name="state"
-                    value={editFormData.state}
-                    onChange={handleInputChange}
-                    className="w-full p-2 border border-gray-300 rounded pr-8"
-                    readOnly
-                  />
-                  <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none">
-                    <ChevronDown size={16} className="text-gray-400" />
-                  </div>
-                </div>
-              </div>
-              
-              <div className="mb-4">
-                <label className="block text-gray-500 text-sm mb-1">Postal Code</label>
-                <input
-                  type="text"
-                  name="postalCode"
-                  value={editFormData.postalCode}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded"
-                />
-              </div>
-              
-              <div className="mb-4">
-                <label className="block text-gray-500 text-sm mb-1">Unit No (Optional)</label>
-                <input
-                  type="text"
-                  name="unit"
-                  value={editFormData.unit}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded"
-                />
-              </div>
-              
-              <div className="mb-4">
-                <label className="block text-gray-500 text-sm mb-1">House Number, Building, Street Name</label>
-                <input
-                  type="text"
-                  name="addressLine"
-                  value={editFormData.addressLine}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border border-gray-300 rounded"
-                />
-              </div>
-              
-              {/* Action Buttons */}
-              <div className="mt-6 flex gap-3">
-                <button 
-                  type="button"
-                  onClick={closeEditModal}
-                  className="flex-1 py-2 px-4 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit"
-                  className="flex-1 py-2 px-4 bg-red-500 text-white rounded-md hover:bg-red-600"
-                >
-                  Submit
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   )
 } 

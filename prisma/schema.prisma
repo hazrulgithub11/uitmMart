@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,12 +7,200 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Define User model
 model User {
+  id           Int        @id @default(autoincrement())
+  email        String     @unique
+  createdAt    DateTime   @default(now())
+  fullName     String
+  password     String
+  role         String     @default("buyer")
+  username     String     @unique
+  dateOfBirth  DateTime?
+  gender       String?
+  phoneNumber  String?
+  profileImage String?
+  addresses    Address[]
+  cartItems    CartItem[]
+  shop         Shop?
+  orders       Order[]    @relation("BuyerOrders")
+  ratings      Rating[]   // Added relation to Rating
+}
+
+model Shop {
+  id              Int       @id @default(autoincrement())
+  name            String
+  description     String?
+  logoUrl         String?
+  phoneNumber     String?
+  email           String?
+  city            String?
+  state           String?
+  country         String    @default("Malaysia")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  sellerId        Int       @unique
+  stripeAccountId String?
+  products        Product[]
+  seller          User      @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  orders          Order[]   @relation("SellerOrders")
+}
+
+model Product {
+  id              Int         @id @default(autoincrement())
+  name            String
+  description     String
+  price           Decimal     @db.Decimal(10, 2)
+  stock           Int         @default(0)
+  category        String
+  status          String      @default("active")
+  images          String[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  shopId          Int
+  stripePriceId   String?
+  stripeProductId String?
+  cartItems       CartItem[]
+  shop            Shop        @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  orderItems      OrderItem[]
+  ratings         Rating[]    // Added relation to Rating
+
+  @@index([category])
+  @@index([status])
+}
+
+model Address {
+  id            Int      @id @default(autoincrement())
+  recipientName String
+  phoneNumber   String
+  addressLine1  String
+  addressLine2  String?
+  city          String
+  state         String
+  postalCode    String
+  country       String   @default("Malaysia")
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  userId        Int
+  latitude      Float?
+  longitude     Float?
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders        Order[]
+
+  @@index([userId])
+}
+
+model CartItem {
   id        Int      @id @default(autoincrement())
-  fullName  String
-  email     String   @unique
-  username  String   @unique
-  password  String
+  quantity  Int      @default(1)
+  variation String?
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    Int
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId, variation])
+  @@index([userId])
+  @@index([productId])
+}
+
+model Order {
+  id               Int         @id @default(autoincrement())
+  orderNumber      String      @unique
+  totalAmount      Decimal     @db.Decimal(10, 2)
+  status           String      @default("pending") // pending, paid, processing, shipped, delivered, cancelled, refunded
+  paymentStatus    String      @default("pending") // pending, paid, failed, refunded, cancelled
+  paymentMethod    String      @default("stripe")
+  stripeSessionId  String?
+  stripeAccountId  String?     // Added to track connected account payments
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  buyerId          Int
+  sellerId         Int
+  addressId        Int
+  platformFee      Decimal     @db.Decimal(10, 2)
+  sellerPayout     Decimal     @db.Decimal(10, 2)
+  cancellationReason String?   // Reason for cancellation
+  cancellationDate  DateTime?  // When the order was cancelled
+  cancelledBy      String?     // Who cancelled the order: buyer, seller, system
+  trackingNumber   String?     // Tracking number for shipment
+  courierCode      String?     // Courier code from tracking.my API
+  courierName      String?     // Courier name
+  shortLink        String?     // Short link from tracking.my for direct tracking access
+  detailedTrackingStatus String?  // Detailed tracking status from courier (e.g. "Out for Delivery")
+  shippedAt        DateTime?   // When the order was shipped
+  deliveredAt      DateTime?   // When the order was delivered
+  buyer            User        @relation("BuyerOrders", fields: [buyerId], references: [id])
+  seller           Shop        @relation("SellerOrders", fields: [sellerId], references: [id])
+  shippingAddress  Address     @relation(fields: [addressId], references: [id])
+  items            OrderItem[]
+  trackingHistory TrackingHistory[] // Added relation to TrackingHistory
+  ratings         Rating[]     // Added relation to Rating
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([stripeSessionId])  // Added index for faster webhook processing
+  @@index([stripeAccountId])  // Added index for connected account lookups
+}
+
+model OrderItem {
+  id          Int      @id @default(autoincrement())
+  quantity    Int
+  unitPrice   Decimal  @db.Decimal(10, 2)
+  totalPrice  Decimal  @db.Decimal(10, 2)
+  variation   String?
+  orderId     Int
+  productId   Int
+  productName String    // Store product name in case product is deleted
+  productImage String?  // Store product image URL in case product is deleted
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model TrackingHistory {
+  id             String   @id @default(cuid())
+  orderId        Int
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  trackingNumber String
+  courierCode    String   // Add courier code (e.g., 'shopee', 'jt', 'pos')
+  status         String   // Status from the checkpoint (e.g., 'in_transit', 'delivered')
+  details        String?  // Message or content from the checkpoint
+  location       String?  // Location from the checkpoint
+  checkpointTime DateTime // Timestamp of the checkpoint event
+  rawData        Json?    // Store the raw JSON of the individual checkpoint for future flexibility
+  createdAt      DateTime @default(now())
+
+  @@index([orderId])
+  @@index([trackingNumber])
+  // Add a unique constraint to prevent duplicate entries for the same checkpoint event
+  @@unique([orderId, trackingNumber, checkpointTime, details], map: "unique_checkpoint_event")
+}
+
+model Rating {
+  id        Int      @id @default(autoincrement())
+  stars     Int      // Rating from 1-5
+  comment   String?  // Optional comment
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderId   Int      // The order associated with this rating
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  // Add unique constraint to prevent multiple ratings for the same product in an order
+  @@unique([userId, productId, orderId])
+  @@index([userId])
+  @@index([productId])
+  @@index([orderId])
 }

@@ -25,7 +25,7 @@ function DockDemo() {
     { 
       icon: User, 
       label: "Account",
-      onClick: () => router.push('/account')
+      onClick: () => router.push('/account-settings')
     },
     { 
       icon: Heart, 

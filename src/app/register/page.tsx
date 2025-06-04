@@ -9,6 +9,15 @@ import { useRouter } from 'next/navigation';
 // Use dynamic import with no SSR for the Threads component since it uses browser APIs
 const Threads = dynamic(() => import('@/components/Threads'), { ssr: false });
 
+// Cartoon UI Style
+const cartoonStyle = {
+  card: "bg-white border-4 border-black rounded-2xl shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] p-6 transition-all hover:shadow-[12px_12px_0px_0px_rgba(0,0,0,0.8)]", 
+  button: "bg-white border-3 border-black rounded-lg shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,0.8)] transition-all active:translate-y-1 active:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]",
+  buttonPrimary: "bg-blue-500 text-white border-3 border-black rounded-lg shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,0.8)] transition-all active:translate-y-1 active:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]",
+  heading: "text-3xl font-extrabold tracking-wide",
+  input: "bg-white border-3 border-black rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+};
+
 export default function RegisterPage() {
   const router = useRouter();
   const [fullName, setFullName] = useState('');
@@ -50,6 +59,7 @@ export default function RegisterPage() {
           email,
           username,
           password,
+          role: 'buyer', // Set default role as buyer
         }),
       });
       
@@ -97,18 +107,18 @@ export default function RegisterPage() {
               />
             </div>
             
-            <p className="text-lg md:text-xl text-center">Join the community of UiTM students buying and selling online.</p>
+            <p className="text-lg md:text-xl text-center font-bold">Join the community of UiTM students buying and selling online.</p>
           </div>
         </div>
 
         {/* Right side with registration form */}
         <div className="w-full md:w-1/2 flex justify-center items-center p-4 md:p-8">
           <div className="w-full max-w-md">
-            <div className="bg-white/90 backdrop-blur-sm p-6 md:p-8 rounded-lg shadow-lg">
-              <h2 className="text-2xl font-semibold mb-6 text-black">Create Account</h2>
+            <div className={`${cartoonStyle.card} bg-white/90 backdrop-blur-sm p-6 md:p-8`}>
+              <h2 className={`${cartoonStyle.heading} text-black mb-6`}>Create Account</h2>
               
               {error && (
-                <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                <div className="mb-4 p-3 bg-red-100 border-3 border-black rounded-lg text-red-700 font-medium">
                   {error}
                 </div>
               )}
@@ -118,7 +128,7 @@ export default function RegisterPage() {
                   <input
                     type="text"
                     placeholder="Full Name"
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-600 text-black"
+                    className={`${cartoonStyle.input} w-full px-3 py-2 text-black`}
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     required
@@ -130,7 +140,7 @@ export default function RegisterPage() {
                   <input
                     type="email"
                     placeholder="Email Address"
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-600 text-black"
+                    className={`${cartoonStyle.input} w-full px-3 py-2 text-black`}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -142,7 +152,7 @@ export default function RegisterPage() {
                   <input
                     type="text"
                     placeholder="Username"
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-600 text-black"
+                    className={`${cartoonStyle.input} w-full px-3 py-2 text-black`}
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     required
@@ -154,7 +164,7 @@ export default function RegisterPage() {
                   <input
                     type="password"
                     placeholder="Password"
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-600 text-black"
+                    className={`${cartoonStyle.input} w-full px-3 py-2 text-black`}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -166,7 +176,7 @@ export default function RegisterPage() {
                   <input
                     type="password"
                     placeholder="Confirm Password"
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-600 text-black"
+                    className={`${cartoonStyle.input} w-full px-3 py-2 text-black`}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
@@ -176,21 +186,21 @@ export default function RegisterPage() {
                 
                 <button
                   type="submit"
-                  className="w-full bg-blue-700 text-white py-2 rounded uppercase font-medium hover:bg-blue-800 transition-colors disabled:bg-blue-400"
+                  className={`${cartoonStyle.buttonPrimary} w-full py-2 text-white uppercase font-bold disabled:opacity-50`}
                   disabled={loading}
                 >
-                  {loading ? 'REGISTERING...' : 'REGISTER'}
+                  {loading ? 'REGISTERING...' : 'REGISTER AS BUYER'}
                 </button>
               </form>
               
               <div className="my-6 flex items-center justify-between">
-                <hr className="w-5/12 border-gray-300" />
-                <span className="text-sm text-gray-500 px-2">OR</span>
-                <hr className="w-5/12 border-gray-300" />
+                <hr className="w-5/12 border-gray-300 border-2" />
+                <span className="text-sm text-gray-700 font-bold px-2">OR</span>
+                <hr className="w-5/12 border-gray-300 border-2" />
               </div>
               
               <button 
-                className="w-full border border-gray-300 py-2 px-4 rounded flex justify-center items-center gap-2 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                className={`${cartoonStyle.button} w-full py-2 px-4 flex justify-center items-center gap-2 disabled:opacity-50`}
                 disabled={loading}
               >
                 <svg viewBox="0 0 24 24" width="20" height="20">
@@ -212,12 +222,19 @@ export default function RegisterPage() {
                   />
                   <path d="M1 1h22v22H1z" fill="none" />
                 </svg>
-                <span>Sign up with Google</span>
+                <span className="font-bold">Sign up with Google</span>
               </button>
               
               <div className="mt-6 text-center text-sm">
-                <span className="text-gray-600">Already have an account?</span>{' '}
-                <Link href="/login" className="text-blue-600 font-medium hover:underline">
+                <span className="text-gray-600 font-medium">Want to sell products?</span>{' '}
+                <Link href="/register-seller" className="text-blue-600 font-bold hover:underline">
+                  Register as Seller
+                </Link>
+              </div>
+              
+              <div className="mt-3 text-center text-sm">
+                <span className="text-gray-600 font-medium">Already have an account?</span>{' '}
+                <Link href="/login" className="text-blue-600 font-bold hover:underline">
                   Log In
                 </Link>
               </div>

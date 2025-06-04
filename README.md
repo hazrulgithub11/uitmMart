@@ -20,7 +20,55 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Tracking Integration
+
+This project includes integration with tracking.my API for automatic courier detection and tracking status updates:
+
+### Setting Up Tracking.my API
+
+1. Register for a seller account at [tracking.my](https://tracking.my/)
+2. Navigate to your API settings page to get your API key
+3. Add your API key to the `.env.local` file:
+
+```
+TRACKING_MY_API_KEY="your-tracking-my-api-key"
+```
+
+4. Restart your server after adding the API key
+
+### Troubleshooting Webhook Registration
+
+If you see the "Failed to register webhook" error in the admin dashboard, check the following:
+
+1. Verify that you have set up the `TRACKING_MY_API_KEY` in your `.env.local` file
+2. Make sure your application is deployed to a publicly accessible URL (tracking.my cannot send webhooks to localhost)
+3. Check that your API key is valid and has permission to register webhooks
+4. If still having issues, contact tracking.my support with your API key details
+
+### Automatic Courier Detection
+
+The system automatically detects courier services when a tracking number is entered in the seller dashboard:
+
+1. Enter a tracking number when updating an order
+2. The system will call tracking.my API to detect the courier
+3. The detected courier information will be displayed and saved with the order
+
+### Webhook Integration
+
+For automatic order status updates based on tracking status:
+
+1. Deploy your application to a publicly accessible URL
+2. Access the admin tracking page at `/admin/tracking`
+3. Register your webhook URL with tracking.my
+4. The system will automatically update order statuses when tracking statuses change
+
 ## Learn More
+
+## Admin credentials
+
+adminEmail = 'admin@uitmmart.com';
+adminPassword = 'Admin@123';
+adminUsername = 'admin';
 
 To learn more about Next.js, take a look at the following resources:
 

@@ -5,6 +5,8 @@ import { motion } from "framer-motion"
 import Link from "next/link"
 import { LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
 
 interface NavItem {
   name: string
@@ -19,6 +21,19 @@ interface NavBarProps {
 
 export function NavBar({ items, className }: NavBarProps) {
   const [activeTab, setActiveTab] = useState(items[0].name)
+  const { data: session } = useSession()
+  const router = useRouter()
+
+  // Function to check if user is authenticated
+  const requireAuth = (e: React.MouseEvent, destinationUrl: string) => {
+    if (!session && destinationUrl !== '/main') {
+      e.preventDefault()
+      // Redirect to login with callback URL to return after login
+      router.push(`/login?callbackUrl=${encodeURIComponent(destinationUrl)}`)
+      return false
+    }
+    return true
+  }
 
   return (
     <nav 
@@ -40,7 +55,13 @@ export function NavBar({ items, className }: NavBarProps) {
             <Link
               key={item.name}
               href={item.url}
-              onClick={() => setActiveTab(item.name)}
+              onClick={(e) => {
+                // Allow navigation to home page without login
+                // But require login for all other nav items
+                if (requireAuth(e, item.url)) {
+                  setActiveTab(item.name)
+                }
+              }}
               className={cn(
                 "relative cursor-pointer text-sm font-semibold px-6 py-2 rounded-full transition-colors",
                 isActive ? "text-white" : "text-zinc-400 hover:text-zinc-200",
