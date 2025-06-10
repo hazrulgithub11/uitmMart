@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +24,7 @@ export async function POST(request: NextRequest) {
     
     // Parse request body
     const body = await request.json();
-    const { tracking_number, courier } = body;
+    const { tracking_number, courier, orderId } = body;
     
     // Validate input
     if (!tracking_number || !courier) {
@@ -56,13 +59,69 @@ export async function POST(request: NextRequest) {
     // Log response for debugging
     console.log('Tracking.my API response:', responseData);
     
+    // Extract short_link from the response
+    let shortLink = null;
+    if (responseData.tracking && responseData.tracking.short_link) {
+      shortLink = responseData.tracking.short_link;
+      console.log(`Extracted short_link: ${shortLink}`);
+      
+      // If orderId is provided, update the order with the shortLink
+      if (orderId) {
+        try {
+          await prisma.order.update({
+            where: { id: parseInt(orderId) },
+            data: { shortLink }
+          });
+          console.log(`Updated order ${orderId} with short link: ${shortLink}`);
+        } catch (error) {
+          console.error('Failed to update order with short link:', error);
+          // Continue anyway, this is not a critical failure
+        }
+      }
+    }
+    
     // Check if registration was successful
     if (!response.ok) {
       // If the tracking number is already registered, consider it a success
       if (responseData.meta?.error_message?.includes('already exists')) {
+        // Try to get the existing tracking info to extract the short_link
+        try {
+          const existingTrackingResponse = await fetch(`https://seller.tracking.my/api/v1/trackings/${courier}/${tracking_number}`, {
+            method: 'GET',
+            headers: {
+              'Tracking-Api-Key': apiKey,
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          const existingTrackingData = await existingTrackingResponse.json();
+          
+          if (existingTrackingData.tracking && existingTrackingData.tracking.short_link) {
+            shortLink = existingTrackingData.tracking.short_link;
+            console.log(`Retrieved short_link for existing tracking: ${shortLink}`);
+            
+            // Update order if orderId is provided
+            if (orderId) {
+              try {
+                await prisma.order.update({
+                  where: { id: parseInt(orderId) },
+                  data: { shortLink }
+                });
+                console.log(`Updated order ${orderId} with short link: ${shortLink}`);
+              } catch (error) {
+                console.error('Failed to update order with short link:', error);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Failed to fetch existing tracking details:', error);
+        }
+        
         return NextResponse.json({
           success: true,
           message: 'Tracking number already registered',
+          shortLink,
           data: responseData
         });
       }
@@ -77,10 +136,11 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Return success response
+    // Return success response with short_link
     return NextResponse.json({
       success: true,
       message: 'Tracking number registered successfully',
+      shortLink,
       data: responseData
     });
     

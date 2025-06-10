@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # Next.js application
+  app:
+    container_name: uitm-mart-app
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:Ajulkacak&12@db:5432/fyp
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+      - TRACKING_MY_API_KEY=${TRACKING_MY_API_KEY}
+      - TRACKING_MY_WEBHOOK_SECRET=${TRACKING_MY_WEBHOOK_SECRET}
+      - GOOGLE_APP_PASSWORD=${GOOGLE_APP_PASSWORD}
+      - EMAIL_FROM=${EMAIL_FROM}
+      - NEXT_PUBLIC_STRIPE_PUBLIC_KEY=${NEXT_PUBLIC_STRIPE_PUBLIC_KEY}
+      - STRIPE_CLIENT_ID=${STRIPE_CLIENT_ID}
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    restart: unless-stopped
+    command: >
+      sh -c "
+        echo 'Running database migrations...' &&
+        npx prisma migrate deploy &&
+        echo 'Migrations completed, starting app...' &&
+        npx next dev
+      "
+
+  # PostgreSQL database
+  db:
+    container_name: uitm-mart-db
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=Ajulkacak&12
+      - POSTGRES_DB=fyp
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # PgAdmin for database management (optional)
+  
+
+volumes:
+  postgres_data:
+  

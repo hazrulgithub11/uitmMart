@@ -5,8 +5,6 @@ import { NextRequest } from 'next/server';
 // Initialize Prisma client
 const prisma = new PrismaClient();
 
-
-
 export const dynamic = 'force-dynamic';
 
 /**
@@ -118,30 +116,58 @@ export async function GET(request: NextRequest) {
       
       // Get latest checkpoint if available
       if (tracking.latest_checkpoint) {
+        console.log('Latest checkpoint found:', JSON.stringify(tracking.latest_checkpoint));
         checkpoints = [tracking.latest_checkpoint];
       }
       
       // Get all checkpoints if available
       if (tracking.checkpoints && Array.isArray(tracking.checkpoints)) {
+        console.log(`Found ${tracking.checkpoints.length} checkpoints in response`);
         checkpoints = tracking.checkpoints;
       }
       
-      // If we have an order ID in the query parameters, update the order with the short link
-      const orderIdParam = searchParams.get('orderId');
-      if (shortLink && orderIdParam) {
-        const orderId = parseInt(orderIdParam);
-        if (!isNaN(orderId)) {
-          try {
-            // Update the order with the shortLink
-            await prisma.order.update({
-              where: { id: orderId },
-              data: { shortLink }
-            });
-            console.log(`Updated order ${orderId} with short link: ${shortLink}`);
-          } catch (error) {
-            console.error('Failed to update order with short link:', error);
+      // If we have latest_checkpoint but no checkpoints array, use it
+      if (checkpoints.length === 0 && tracking.latest_checkpoint) {
+        checkpoints = [tracking.latest_checkpoint];
+      }
+      
+      // Try to update order with shortLink
+      try {
+        // First, check if we have an order ID in the query parameters
+        let orderId = null;
+        const orderIdParam = searchParams.get('orderId');
+        
+        if (orderIdParam) {
+          orderId = parseInt(orderIdParam);
+        } else {
+          // If no orderId provided, try to find the order by tracking number
+          const order = await prisma.order.findFirst({
+            where: { 
+              trackingNumber: trackingNumber,
+              courierCode: courierCode
+            },
+            select: { id: true }
+          });
+          
+          if (order) {
+            orderId = order.id;
+            console.log(`Found order ${orderId} for tracking number ${trackingNumber}`);
           }
         }
+        
+        // If we have an orderId and shortLink, update the order
+        if (orderId && shortLink) {
+          await prisma.order.update({
+            where: { id: orderId },
+            data: { 
+              shortLink,
+              detailedTrackingStatus: detailedStatus
+            }
+          });
+          console.log(`Updated order ${orderId} with short link: ${shortLink}`);
+        }
+      } catch (error) {
+        console.error('Failed to update order with short link:', error);
       }
       
       // Save the tracking history to our database for persistence
@@ -185,23 +211,95 @@ export async function GET(request: NextRequest) {
 /**
  * Save tracking history to database for persistence
  */
-async function saveTrackingHistory(trackingNumber: string, courierCode: string, checkpoints: unknown[]) {
-  // This should be implemented to save the tracking history to a database
-  // For now, just log it
-  console.log('Would save tracking history for:', trackingNumber, courierCode, checkpoints.length, 'checkpoints');
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function saveTrackingHistory(trackingNumber: string, courierCode: string, checkpoints: any[]) {
+  console.log('Saving tracking history for:', trackingNumber, courierCode, checkpoints.length, 'checkpoints');
+  
+  if (!checkpoints || checkpoints.length === 0) {
+    console.log('No checkpoints to save');
+    return { success: true, message: 'No checkpoints to save' };
+  }
   
   try {
-    // Directly use Prisma here instead of making an API call to avoid URL issues
-    // If we have the orderId from a query parameter or context, we would use it here
-    // For now, this function will log but not actually save anything
-    console.log('Checkpoints data:', JSON.stringify(checkpoints.slice(0, 2), null, 2) + '...');
+    // Find the order associated with this tracking number
+    const order = await prisma.order.findFirst({
+      where: {
+        trackingNumber,
+        courierCode
+      },
+      select: {
+        id: true
+      }
+    });
     
-    // If needed later, implement direct Prisma calls here
-    // This would avoid the need for another API call within the same backend
+    if (!order) {
+      console.warn(`No order found for tracking number ${trackingNumber} and courier ${courierCode}`);
+      return { success: false, message: 'No associated order found' };
+    }
     
-    return { success: true, message: 'Tracking history logged (not saved)' };
+    const orderId = order.id;
+    console.log(`Found order ${orderId} for tracking ${trackingNumber}`);
+    
+    // Process each checkpoint and save to database
+    const savedCheckpoints = [];
+    
+    for (const checkpoint of checkpoints) {
+      // Extract checkpoint data with fallbacks for different API response formats
+      const checkpointTime = new Date(
+        checkpoint.time || 
+        checkpoint.checkpoint_time || 
+        checkpoint.created_at || 
+        new Date()
+      );
+      
+      const status = checkpoint.status || 'info_received';
+      const details = checkpoint.content || checkpoint.message || checkpoint.description || '';
+      const location = checkpoint.location || '';
+      
+      // Create a unique identifier for the checkpoint to avoid duplicates
+      const checkpointIdentifier = `${orderId}-${trackingNumber}-${checkpointTime.toISOString()}-${details}`;
+      
+      try {
+        // Use upsert to avoid duplicate checkpoints
+        const savedCheckpoint = await prisma.trackingHistory.upsert({
+          where: {
+            // Create a compound ID that matches our unique constraint
+            id: checkpointIdentifier
+          },
+          update: {
+            // If it exists, update these fields
+            status,
+            location,
+            rawData: checkpoint
+          },
+          create: {
+            // If it doesn't exist, create a new record
+            id: checkpointIdentifier,
+            orderId,
+            trackingNumber,
+            courierCode,
+            status,
+            details,
+            location,
+            checkpointTime,
+            rawData: checkpoint
+          }
+        });
+        
+        savedCheckpoints.push(savedCheckpoint);
+        console.log(`Saved checkpoint: ${status} at ${location} (${checkpointTime.toISOString()})`);
+      } catch (error) {
+        console.error(`Failed to save checkpoint: ${error instanceof Error ? error.message : String(error)}`);
+        // Continue with other checkpoints even if one fails
+      }
+    }
+    
+    return { 
+      success: true, 
+      message: `Saved ${savedCheckpoints.length} checkpoints for order ${orderId}` 
+    };
   } catch (error) {
-    console.error('Failed to process tracking history:', error);
+    console.error('Failed to save tracking history:', error);
     throw error;
   }
 } 

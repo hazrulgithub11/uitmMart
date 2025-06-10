@@ -57,7 +57,9 @@ interface Order {
   courier?: string;
   courierCode?: string;
   courierName?: string;
+  shortLink?: string;
   shippedAt?: string;
+  deliveredAt?: string;
   buyer: {
     id: number;
     fullName: string;
@@ -113,6 +115,7 @@ interface TrackingDetails {
   detailedStatus?: string;
   message?: string;
   courierName?: string;
+  shortLink?: string;
   error?: string;
 }
 
@@ -136,10 +139,11 @@ const cartoonStyle = {
 
 // Shipping Details Modal Component
 const ShippingDetailsModal: React.FC<ShippingDetailsModalProps> = ({ isOpen, onClose, order, onUpdateOrder }) => {
-  const [trackingNumber, setTrackingNumber] = useState(order?.trackingNumber || '');
-  const [courierCode, setCourierCode] = useState(order?.courierCode || '');
-  const [courierName, setCourierName] = useState(order?.courierName || '');
-  const [orderStatus, setOrderStatus] = useState(order?.status || '');
+  // Initialize with empty values to avoid undefined state
+  const [trackingNumber, setTrackingNumber] = useState('');
+  const [courierCode, setCourierCode] = useState('');
+  const [courierName, setCourierName] = useState('');
+  const [orderStatus, setOrderStatus] = useState('');
   const [cancelReason, setCancelReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [trackingDetails, setTrackingDetails] = useState<TrackingDetails | null>(null);
@@ -148,6 +152,31 @@ const ShippingDetailsModal: React.FC<ShippingDetailsModalProps> = ({ isOpen, onC
   const [orderTrackingHistory, setOrderTrackingHistory] = useState<TrackingCheckpoint[]>([]); // State for historical checkpoints
   const [courierSearch, setCourierSearch] = useState(''); // For courier search functionality
   const [isSimulatingWebhook, setIsSimulatingWebhook] = useState(false); // State for webhook simulation
+
+  // Initialize state values from order when modal opens
+  useEffect(() => {
+    if (order && isOpen) {
+      console.log('Modal opened with order:', order.id);
+      console.log('Setting initial values:', {
+        trackingNumber: order.trackingNumber || '',
+        courierCode: order.courierCode || '',
+        courierName: order.courierName || '',
+        status: order.status || ''
+      });
+      
+      // Set form values from order
+      setTrackingNumber(order.trackingNumber || '');
+      setCourierCode(order.courierCode || '');
+      setCourierName(order.courierName || '');
+      setOrderStatus(order.status || '');
+      setCancelReason('');
+      
+      // Fetch tracking history if there's a tracking number
+      if (order.trackingNumber && order.id) {
+        fetchOrderTrackingHistory(order.id);
+      }
+    }
+  }, [order, isOpen]);
 
   // Fetch historical tracking data from our database
   const fetchOrderTrackingHistory = async (orderId: number | undefined) => {
@@ -186,7 +215,7 @@ const ShippingDetailsModal: React.FC<ShippingDetailsModalProps> = ({ isOpen, onC
         setOrderTrackingHistory(sortedHistory);
         console.log('Fetched order tracking history:', sortedHistory);
       } else {
-        console.warn('No tracking history data found in response');
+        console.log('No tracking history data found in response');
         setOrderTrackingHistory([]);
       }
     } catch (error) {
@@ -212,7 +241,8 @@ const ShippingDetailsModal: React.FC<ShippingDetailsModalProps> = ({ isOpen, onC
         },
         body: JSON.stringify({
           tracking_number: trackingNum,
-          courier: courierCd.toLowerCase()
+          courier: courierCd.toLowerCase(),
+          orderId: order?.id // Pass the orderId to update the order with the shortLink
         }),
       });
       
@@ -224,6 +254,11 @@ const ShippingDetailsModal: React.FC<ShippingDetailsModalProps> = ({ isOpen, onC
       
       const data = await response.json();
       console.log('Tracking registration response:', data);
+      
+      // If we got a shortLink, save it
+      if (data.shortLink) {
+        console.log('Received short link:', data.shortLink);
+      }
       
       // Return true if registration was successful
       return data.success === true;
@@ -371,25 +406,6 @@ const ShippingDetailsModal: React.FC<ShippingDetailsModalProps> = ({ isOpen, onC
     }
   }, [trackingNumber, courierCode, order, orderStatus]);
 
-  useEffect(() => {
-    if (order) {
-      setTrackingNumber(order.trackingNumber || '');
-      setCourierCode(order.courierCode || '');
-      setCourierName(order.courierName || '');
-      setOrderStatus(order.status);
-      setCancelReason('');
-      setTrackingDetails(null);
-      setTrackingError('');
-      setOrderTrackingHistory([]); // Reset history on order change
-      setCourierSearch(''); // Reset courier search
-      
-      // Auto-fetch tracking details ONLY if tracking number is already saved in the database
-      if (order.trackingNumber && order.courierCode) {
-        fetchTrackingDetails(order.trackingNumber, order.courierCode);
-      }
-    }
-  }, [order, fetchTrackingDetails]);
-
   // Fetch initial tracking data when modal is opened with existing tracking information
   useEffect(() => {
     if (!isOpen || !trackingNumber || !courierCode) return;
@@ -489,6 +505,9 @@ const ShippingDetailsModal: React.FC<ShippingDetailsModalProps> = ({ isOpen, onC
           // The tracking data can be registered later when fetching
         } else {
           console.log('Successfully registered tracking number with tracking.my API');
+          
+          // Fetch the tracking details to get the latest short_link
+          await fetchTrackingDetails(trackingNumber, courierCode);
         }
       }
       
@@ -503,13 +522,23 @@ const ShippingDetailsModal: React.FC<ShippingDetailsModalProps> = ({ isOpen, onC
 
   // Handle tracking number change with debounce
   const handleTrackingNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setTrackingNumber(value);
-    
-    // Clear courier selection when tracking number is cleared
-    if (!value || value.trim() === '') {
-      setCourierCode('');
-      setCourierName('');
+    try {
+      const value = e.target.value;
+      console.log('Setting tracking number to:', value);
+      
+      // Force the update with setTimeout to ensure React processes it
+      setTimeout(() => {
+        setTrackingNumber(value);
+      }, 0);
+      
+      // Clear courier selection when tracking number is cleared
+      if (!value || value.trim() === '') {
+        setCourierCode('');
+        setCourierName('');
+      }
+      console.log('Updated tracking number:', value);
+    } catch (error) {
+      console.error('Error updating tracking number:', error);
     }
   };
 
@@ -578,24 +607,38 @@ const ShippingDetailsModal: React.FC<ShippingDetailsModalProps> = ({ isOpen, onC
                       id="tracking" 
                       placeholder="Enter tracking number"
                       className={`${cartoonStyle.input} text-black flex-1`}
-                      value={trackingNumber}
+                      value={trackingNumber || ''}
                       onChange={handleTrackingNumberChange}
+                      key={`tracking-input-${isOpen}-${order?.id}`}
                     />
                   </div>
+                  {/* Debug display to verify state - you can remove this after testing */}
+                  <div className="text-xs text-gray-500">State value: {trackingNumber}</div>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="courier" className="font-bold text-black">Courier Service</Label>
                   <Select 
-                    value={courierCode} 
+                    value={courierCode || ''} 
                     onValueChange={(value) => {
-                      setCourierCode(value);
-                      const selected = courierOptions.find(c => c.code === value);
-                      if (selected) {
-                        setCourierName(selected.name);
+                      try {
+                        console.log('Selected courier code:', value);
+                        
+                        // Force the update with setTimeout
+                        setTimeout(() => {
+                          setCourierCode(value);
+                          const selected = courierOptions.find(c => c.code === value);
+                          if (selected) {
+                            setCourierName(selected.name);
+                            console.log('Selected courier name:', selected.name);
+                          }
+                        }, 0);
+                        
+                        // Clear the search after selection
+                        setCourierSearch('');
+                      } catch (error) {
+                        console.error('Error selecting courier:', error);
                       }
-                      // Clear the search after selection
-                      setCourierSearch('');
                     }}
                     onOpenChange={(open) => {
                       // Clear search when dropdown is closed
@@ -603,6 +646,7 @@ const ShippingDetailsModal: React.FC<ShippingDetailsModalProps> = ({ isOpen, onC
                         setCourierSearch('');
                       }
                     }}
+                    key={`courier-select-${isOpen}-${order?.id}`}
                   >
                     <SelectTrigger className={`${cartoonStyle.input} bg-white !text-black`}>
                       <SelectValue placeholder="Select courier">
@@ -847,9 +891,26 @@ const ShippingDetailsModal: React.FC<ShippingDetailsModalProps> = ({ isOpen, onC
 
               <div className="space-y-2">
                 <Label htmlFor="status" className="font-bold text-black">Order Status</Label>
-                <Select value={orderStatus} onValueChange={setOrderStatus}>
+                <Select 
+                  value={orderStatus || ''} 
+                  onValueChange={(value) => {
+                    try {
+                      console.log('Selected order status:', value);
+                      
+                      // Force the update with setTimeout
+                      setTimeout(() => {
+                        setOrderStatus(value);
+                      }, 0);
+                    } catch (error) {
+                      console.error('Error setting order status:', error);
+                    }
+                  }}
+                  key={`status-select-${isOpen}-${order?.id}-${orderStatus}`}
+                >
                   <SelectTrigger className={`${cartoonStyle.input} bg-white !text-black`}>
-                    <SelectValue placeholder="Update status" />
+                    <SelectValue placeholder="Update status">
+                      {orderStatus ? orderStatus.charAt(0).toUpperCase() + orderStatus.slice(1) : 'Update status'}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="bg-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] !text-black">
                     <SelectGroup>
@@ -862,6 +923,36 @@ const ShippingDetailsModal: React.FC<ShippingDetailsModalProps> = ({ isOpen, onC
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Display tracking short link if available */}
+              {(order?.shortLink || trackingDetails?.shortLink) && (
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg border-2 border-blue-200 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
+                  <div className="flex justify-between items-center mb-2">
+                    <Label className="font-bold text-black">Tracking Link:</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className={`${cartoonStyle.button} text-xs py-0 h-7 text-black`}
+                      onClick={() => {
+                        const link = trackingDetails?.shortLink || order?.shortLink;
+                        if (link) {
+                          navigator.clipboard.writeText(link);
+                          alert('Tracking link copied to clipboard!');
+                        }
+                      }}
+                    >
+                      Copy Link
+                    </Button>
+                  </div>
+                  <p className="text-sm text-blue-800 break-all">
+                    {trackingDetails?.shortLink || order?.shortLink}
+                  </p>
+                  <p className="text-xs text-gray-600 mt-2">
+                    Share this link with the customer to let them track their package.
+                  </p>
+                </div>
+              )}
 
               {orderStatus === 'cancelled' && (
                 <div className="space-y-2">

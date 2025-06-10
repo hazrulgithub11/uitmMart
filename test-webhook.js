@@ -4,7 +4,7 @@ const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch
 async function testWebhook() {
   try {
     console.log('Testing webhook endpoint...');
-    const webhookUrl = 'https://d69e-2001-d08-e1-a6c-7071-2c0d-6654-7558.ngrok-free.app/api/webhook/stripe';
+    const webhookUrl = 'https://f66e-2001-d08-e1-1268-b15d-8c18-a27f-6f81.ngrok-free.app/api/webhook/stripe';
     
     // Make a simple POST request to the webhook endpoint
     const response = await fetch(webhookUrl, {
@@ -31,7 +31,7 @@ async function testWebhook() {
     console.log('Response body:', responseData);
     
     console.log('\nNow checking environment variables...');
-    const envResponse = await fetch('https://d69e-2001-d08-e1-a6c-7071-2c0d-6654-7558.ngrok-free.app/api/env-check');
+    const envResponse = await fetch('https://f66e-2001-d08-e1-1268-b15d-8c18-a27f-6f81.ngrok-free.app/api/env-check');
     const envData = await envResponse.json();
     console.log('Environment variables status:');
     console.log(JSON.stringify(envData, null, 2));

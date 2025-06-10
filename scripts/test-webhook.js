@@ -16,7 +16,7 @@ async function sendTestWebhook() {
     }
     
     // Use your ngrok URL or actual domain here
-    const webhookUrl = "https://d69e-2001-d08-e1-a6c-7071-2c0d-6654-7558.ngrok-free.app/api/tracking/webhook";
+    const webhookUrl = "https://f66e-2001-d08-e1-1268-b15d-8c18-a27f-6f81.ngrok-free.app/api/tracking/webhook";
     console.log('Sending test webhook to:', webhookUrl);
     
     // Create a test webhook payload

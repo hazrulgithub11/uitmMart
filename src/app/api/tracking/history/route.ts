@@ -1,63 +1,82 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
 
 const prisma = new PrismaClient();
 
-export async function GET(req: Request) {
+export const dynamic = 'force-dynamic';
+
+/**
+ * API endpoint to fetch tracking history from our database
+ */
+export async function GET(request: NextRequest) {
   try {
-    // Get the current user session
-    const session = await getServerSession(authOptions);
+    // Get query parameters
+    const searchParams = request.nextUrl.searchParams;
+    const orderId = searchParams.get('orderId');
+    const trackingNumber = searchParams.get('trackingNumber');
     
-    if (!session?.user?.id) {
+    // Validate input - need at least one parameter
+    if (!orderId && !trackingNumber) {
       return NextResponse.json(
-        { error: 'Unauthorized', success: false },
-        { status: 401 }
+        { 
+          success: false, 
+          error: 'Either orderId or trackingNumber is required' 
+        },
+        { status: 400 }
       );
     }
-
-    const { searchParams } = new URL(req.url);
-    const orderId = searchParams.get('orderId');
-
-    if (!orderId) {
-      return NextResponse.json({ 
-        error: 'orderId is required', 
-        success: false 
-      }, { status: 400 });
+    
+    // Build the query
+    const query: Record<string, unknown> = {};
+    
+    if (orderId) {
+      const orderIdInt = parseInt(orderId);
+      if (isNaN(orderIdInt)) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid orderId format' },
+          { status: 400 }
+        );
+      }
+      query.orderId = orderIdInt;
     }
-
-    console.log(`Fetching tracking history for order: ${orderId}`);
-
-    // Use raw SQL query instead of Prisma model directly
-    const trackingHistory = await prisma.$queryRaw`
-      SELECT * FROM "TrackingHistory" 
-      WHERE "orderId" = ${parseInt(orderId, 10)}
-      ORDER BY "checkpointTime" DESC
-    `;
-
-    if (!trackingHistory || !Array.isArray(trackingHistory) || trackingHistory.length === 0) {
-      console.log(`No tracking history found for order ${orderId}`);
-      // Return empty array instead of null to avoid frontend errors
-      return NextResponse.json({ 
-        success: true, 
-        trackingHistory: [],
-        message: 'No tracking history found'
+    
+    if (trackingNumber) {
+      query.trackingNumber = trackingNumber;
+    }
+    
+    console.log('Fetching tracking history with query:', query);
+    
+    // Fetch tracking history from database
+    const trackingHistory = await prisma.trackingHistory.findMany({
+      where: query,
+      orderBy: {
+        checkpointTime: 'desc'
+      }
+    });
+    
+    if (trackingHistory.length === 0) {
+      console.log(`No tracking history found for ${orderId ? 'order ' + orderId : ''} ${trackingNumber ? 'tracking ' + trackingNumber : ''}`);
+      return NextResponse.json({
+        success: true,
+        trackingHistory: []
       });
     }
-
-    console.log(`Found ${trackingHistory.length} tracking history records for order ${orderId}`);
-    return NextResponse.json({ 
+    
+    console.log(`Found ${trackingHistory.length} tracking history records`);
+    
+    // Return the tracking history
+    return NextResponse.json({
       success: true,
-      trackingHistory: trackingHistory 
+      trackingHistory
     });
+    
   } catch (error) {
     console.error('Error fetching tracking history:', error);
+    
     return NextResponse.json(
       { 
-        success: false,
-        error: 'Failed to fetch tracking history',
-        details: error instanceof Error ? error.message : String(error)
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error occurred' 
       },
       { status: 500 }
     );

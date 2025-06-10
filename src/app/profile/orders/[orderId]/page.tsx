@@ -3,8 +3,17 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, CheckCircle, Truck, ShoppingBag, Receipt, Star, Loader2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Truck, ShoppingBag, Receipt, Star, Loader2, AlertCircle } from 'lucide-react';
 import RatingModal from '@/components/RatingModal';
+  import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 // Cartoon UI Style
 const cartoonStyle = {
@@ -80,9 +89,10 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
   const [trackingHistory, setTrackingHistory] = useState<TrackingHistory[]>([]);
   const [showRateProduct, setShowRateProduct] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<OrderItem | null>(null);
-  const [ratingSuccess, setRatingSuccess] = useState(false);
   const [ratedProducts, setRatedProducts] = useState<Set<number>>(new Set());
   const [hasRatedAnyProduct, setHasRatedAnyProduct] = useState(false);
+  const [ratingSuccess, setRatingSuccess] = useState(false);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   
   // Unwrap params using React.use()
   const unwrappedParams = React.use(params);
@@ -193,9 +203,9 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
       },
       { 
         status: 'Order Shipped Out', 
-        date: order.status === 'shipped' || order.status === 'delivered' ? 
+        date: order.status === 'shipped' ? 
               trackingHistory.length > 0 ? new Date(trackingHistory[trackingHistory.length-1].checkpointTime).toLocaleDateString() : '' : '',
-        time: order.status === 'shipped' || order.status === 'delivered' ? 
+        time: order.status === 'shipped' ? 
               trackingHistory.length > 0 ? new Date(trackingHistory[trackingHistory.length-1].checkpointTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '' : '',
         completed: order.status === 'shipped' || order.status === 'delivered'
       },
@@ -220,6 +230,12 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
   
   // Handle "Confirm Received" button click
   const handleConfirmReceived = async () => {
+    // Open confirmation dialog instead of immediately confirming
+    setConfirmDialogOpen(true);
+  };
+  
+  // Handle actual confirmation after dialog confirmation
+  const handleConfirmReceivedConfirmed = async () => {
     try {
       setLoading(true);
       
@@ -238,6 +254,9 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
       const updatedOrderResponse = await fetch(`/api/orders/${orderId}`);
       const updatedOrderData = await updatedOrderResponse.json();
       setOrder(updatedOrderData.order);
+      
+      // Close the dialog
+      setConfirmDialogOpen(false);
       
     } catch (err) {
       console.error('Error confirming order received:', err);
@@ -651,6 +670,60 @@ export default function OrderDetailsPage({ params }: { params: Promise<{ orderId
             productImage={selectedProduct.productImage || '/images/placeholder.svg'}
           />
         )}
+
+        {/* Confirmation Dialog */}
+        <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+          <DialogContent className={`${cartoonStyle.card} max-w-md bg-yellow-50`}>
+            <DialogHeader>
+              <DialogTitle className="text-lg font-bold text-black">Confirm Order Receipt</DialogTitle>
+              <DialogDescription className="text-gray-700">
+                Have you actually received the physical package? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="py-4">
+              <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <AlertCircle className="h-5 w-5 text-amber-500" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-amber-700">
+                      Only confirm if you have physically received the package. 
+                      Confirming will mark the order as delivered and release payment to the seller.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <DialogFooter className="sm:justify-center gap-2">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setConfirmDialogOpen(false)}
+                className={`${cartoonStyle.button} text-black flex-1`}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="button" 
+                onClick={handleConfirmReceivedConfirmed}
+                className={`${cartoonStyle.buttonSuccess} flex-1`}
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
+                    Processing...
+                  </>
+                ) : (
+                  <>Yes, I Received It</>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

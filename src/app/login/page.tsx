@@ -299,7 +299,7 @@ function LoginContent() {
               <div className="mt-4 text-center">
                 <p className="text-black">
                   Don&apos;t have an account?{' '}
-                  <Link href="/signup" className="text-blue-600 hover:underline font-semibold">
+                  <Link href="/register" className="text-blue-600 hover:underline font-semibold">
                     Sign Up
                   </Link>
                 </p>
