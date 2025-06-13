@@ -55,8 +55,38 @@ services:
     restart: unless-stopped
 
   # PgAdmin for database management (optional)
-  
+  pgadmin:
+    container_name: uitm-mart-pgadmin
+    image: dpage/pgadmin4:latest
+    ports:
+      - "5050:80"
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=hazrulsehebat@gmail.com
+      - PGADMIN_DEFAULT_PASSWORD=Ajulkacak&12
+    depends_on:
+      - db
+    restart: unless-stopped
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      
+  # Prisma Studio for database management
+  prisma-studio:
+    container_name: uitm-mart-prisma-studio
+    image: node:lts-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "5555:5555"
+    depends_on:
+      - db
+      - app
+    environment:
+      - DATABASE_URL=postgresql://postgres:Ajulkacak&12@db:5432/fyp
+    command: npx prisma studio --port 5555 --browser none
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+  pgadmin_data:
   
