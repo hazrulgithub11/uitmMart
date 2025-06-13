@@ -19,6 +19,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Generate Prisma client for development
+RUN chmod -R 755 node_modules/.bin
 RUN npx prisma generate
 
 # Expose port
@@ -38,6 +39,7 @@ ENV NEXT_TELEMETRY_DISABLED 1
 ENV NODE_ENV production
 
 # Generate Prisma client
+RUN chmod -R 755 node_modules/.bin
 RUN npx prisma generate
 
 # Build the application
