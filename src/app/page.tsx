@@ -26,7 +26,7 @@ export default function Home() {
                 className="object-contain"
               />
             </div>
-            <span className="text-white font-bold text-xl">UiTMMarttttttttt</span>
+            <span className="text-white font-bold text-xl">UiTMMart</span>
           </div>
           
           {/* Centered dock navigation (desktop only) */}
