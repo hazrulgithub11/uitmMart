@@ -1,9 +1,11 @@
 import nodemailer from 'nodemailer';
 import { Order, OrderItem, User } from '@prisma/client';
 
-// Configure nodemailer with Gmail
+// Configure nodemailer with Gmail using SSL (port 465)
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true, // use SSL
   auth: {
     user: 'hazrulsehebat@gmail.com',
     pass: 'ijso gwdy esxk jfoe', // App password
