@@ -31,7 +31,7 @@ export default function SellerPaymentPage() {
   // Base URL for the webhook
   const baseUrl = typeof window !== 'undefined' 
     ? `${window.location.protocol}//${window.location.host}`
-    : 'https://f66e-2001-d08-e1-1268-b15d-8c18-a27f-6f81.ngrok-free.app';
+    : 'https://uitmmart.site';
   
   const webhookUrl = `${baseUrl}/api/webhook/stripe`;
   

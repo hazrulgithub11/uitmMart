@@ -19,7 +19,7 @@ async function testWebhookRegistration() {
     console.log('Using API key:', apiKey.substring(0, 3) + '...' + apiKey.substring(apiKey.length - 3));
     
     // Use your ngrok URL or actual domain here
-    const webhookUrl = "https://f66e-2001-d08-e1-1268-b15d-8c18-a27f-6f81.ngrok-free.app/api/tracking/webhook";
+    const webhookUrl = "https://uitmmart.site/api/tracking/webhook";
     console.log('Registering webhook at:', webhookUrl);
     
     // Register the webhook directly with tracking.my
