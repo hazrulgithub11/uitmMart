@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { CheckCircle, ArrowRight, ShoppingBag, Home, Search, Bell, User } from 'lucide-react';
+import { CheckCircle, ArrowRight, ShoppingBag, Home, Search, Bell, User, Mail } from 'lucide-react';
 import Link from 'next/link';
 import { NavBar } from "@/components/ui/tubelight-navbar";
 
@@ -152,9 +152,17 @@ function CheckoutSuccessContent() {
             </div>
             
             <h1 className="text-3xl font-bold text-black mb-2">Payment Successful!</h1>
-            <p className="text-gray-600 mb-8 text-center">
+            <p className="text-gray-600 mb-4 text-center">
               Thank you for your purchase. Your order has been confirmed.
             </p>
+            
+            {/* Email notification message */}
+            <div className="flex items-center bg-blue-50 p-4 rounded-lg border-2 border-blue-200 mb-6 w-full max-w-md">
+              <Mail className="h-5 w-5 text-blue-500 mr-3 flex-shrink-0" />
+              <p className="text-blue-700 text-sm">
+                A confirmation email has been sent to your registered email address.
+              </p>
+            </div>
             
             {orderDetails && (
               <div className="bg-gray-50 border-3 border-black rounded-lg p-6 w-full max-w-md mb-8">

@@ -158,13 +158,52 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session, 
           }
         });
         
-        if (order) {
-          console.log(`Sending order confirmation email for order ${orderId} to ${order.buyer.email}`);
-          await sendOrderConfirmationEmail({ order });
+        if (!order) {
+          console.error(`Order ${orderId} not found when trying to send email`);
+          continue;
         }
-      } catch (emailError) {
-        console.error(`Error sending email for order ${orderId}:`, emailError);
-        // Continue processing other orders even if one email fails
+        
+        // Get buyer information separately since it's not directly included in the order type
+        const buyer = await prisma.user.findUnique({
+          where: { id: order.buyerId }
+        });
+        
+        if (!buyer?.email) {
+          console.error(`No email found for buyer (ID: ${order.buyerId}) of order ${orderId}`);
+          continue;
+        }
+        
+        console.log(`Sending order confirmation email for order ${orderId} to ${buyer.email}`);
+        
+        // Try to send the email with retries
+        let attempts = 0;
+        const maxAttempts = 3;
+        
+        while (attempts < maxAttempts) {
+          try {
+            await sendOrderConfirmationEmail({ 
+              order: {
+                ...order,
+                buyer
+              } 
+            });
+            console.log(`Email sent successfully for order ${orderId}`);
+            break;
+          } catch (emailError) {
+            attempts++;
+            console.error(`Error sending email for order ${orderId} (attempt ${attempts}/${maxAttempts}):`, emailError);
+            
+            if (attempts >= maxAttempts) {
+              console.error(`Failed to send email after ${maxAttempts} attempts for order ${orderId}`);
+              // Could log to a separate error tracking system here
+            } else {
+              // Wait before retrying
+              await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Error processing email for order ${orderId}:`, error);
       }
     }
   } catch (error) {
