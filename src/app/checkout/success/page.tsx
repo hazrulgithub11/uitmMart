@@ -26,7 +26,7 @@ const navItems = [
 
 // Define interfaces for order items and cart items
 interface OrderItem {
-  productId: string;
+  productId: number;  // Changed from string to number to match database schema
   quantity: number;
   price: number;
   name?: string;
@@ -34,8 +34,8 @@ interface OrderItem {
 }
 
 interface CartItem {
-  id: string;
-  productId: string;
+  id: number;  // Changed from string to number to match database schema
+  productId: number;  // Changed from string to number to match database schema
   quantity: number;
   price?: number;
   name?: string;
@@ -77,7 +77,12 @@ function CheckoutSuccessContent() {
   // Clear items from cart after successful payment
   const clearCartItems = async (orderItems: OrderItem[]) => {
     try {
-      if (!orderItems || orderItems.length === 0) return;
+      if (!orderItems || orderItems.length === 0) {
+        console.log('No order items to process for cart cleanup');
+        return;
+      }
+      
+      console.log('Processing order items for cart cleanup:', orderItems.length);
       
       // Get cart items that match the products in the order
       const response = await fetch('/api/cart');
@@ -89,17 +94,34 @@ function CheckoutSuccessContent() {
       const cartData = await response.json();
       const cartItems = cartData.cartItems || [];
       
+      console.log('Total cart items:', cartItems.length);
+      
+      // Debug logging to see the structure of the data
+      if (orderItems.length > 0 && cartItems.length > 0) {
+        console.log('Sample order item productId:', orderItems[0].productId, 'type:', typeof orderItems[0].productId);
+        console.log('Sample cart item productId:', cartItems[0].productId, 'type:', typeof cartItems[0].productId);
+      }
+      
       // Find cart items that match the products in the order
-      const cartItemsToDelete = cartItems.filter((cartItem: CartItem) => 
-        orderItems.some((orderItem: OrderItem) => 
-          // Convert both to string for comparison to handle type mismatches
-          String(orderItem.productId) === String(cartItem.productId)
-        )
-      ).map((item: CartItem) => item.id);
+      // Use a more robust comparison that handles both number and string types
+      const cartItemsToDelete = cartItems.filter((cartItem: CartItem) => {
+        return orderItems.some((orderItem: OrderItem) => {
+          // Try direct comparison first
+          if (orderItem.productId === cartItem.productId) {
+            return true;
+          }
+          
+          // If direct comparison fails, try string comparison
+          return String(orderItem.productId) === String(cartItem.productId);
+        });
+      }).map((item: CartItem) => item.id);
       
       console.log('Found cart items to delete:', cartItemsToDelete.length);
       
-      if (cartItemsToDelete.length === 0) return;
+      if (cartItemsToDelete.length === 0) {
+        console.log('No matching cart items found to delete');
+        return;
+      }
       
       // Delete the items from cart using bulk delete endpoint
       const deleteResponse = await fetch('/api/cart/bulk', {
@@ -138,6 +160,7 @@ function CheckoutSuccessContent() {
   
   const fetchOrderDetails = async (stripeSessionId: string) => {
     try {
+      console.log('Fetching order details for session:', stripeSessionId);
       const response = await fetch(`/api/orders/session?sessionId=${stripeSessionId}`);
       
       if (!response.ok) {
@@ -145,15 +168,21 @@ function CheckoutSuccessContent() {
       }
       
       const data = await response.json();
+      console.log('Order data received:', data);
       
       if (data.order) {
         setOrderDetails(data.order);
         
         // Clear cart items after successful payment
-        if (data.order.items) {
+        if (data.order.items && data.order.items.length > 0) {
+          console.log('Order items found:', data.order.items.length);
+          console.log('First order item:', JSON.stringify(data.order.items[0]));
           await clearCartItems(data.order.items);
+        } else {
+          console.log('No order items found in the order data');
         }
       } else {
+        console.log('No order found, using fallback data');
         // Fallback to simulated data if no order found
         setOrderDetails({
           orderNumber: `UITM-${Date.now().toString().slice(-6)}`,
