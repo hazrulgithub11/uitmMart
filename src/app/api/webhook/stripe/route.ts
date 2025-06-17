@@ -57,6 +57,14 @@ export async function POST(req: Request) {
         console.log('Processing checkout.session.completed event');
         await handleCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session, stripeAccount);
         break;
+      case 'checkout.session.expired':
+        console.log('Processing checkout.session.expired event');
+        await handleCheckoutSessionFailed(event.data.object as Stripe.Checkout.Session, stripeAccount, 'expired');
+        break;
+      case 'checkout.session.async_payment_failed':
+        console.log('Processing checkout.session.async_payment_failed event');
+        await handleCheckoutSessionFailed(event.data.object as Stripe.Checkout.Session, stripeAccount, 'payment_failed');
+        break;
       case 'payment_intent.succeeded':
         console.log('Processing payment_intent.succeeded event');
         await handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent, stripeAccount);
@@ -93,7 +101,10 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session, 
   }
 
   const orderIds = session.metadata.orderIds.split(',').map(id => parseInt(id));
+  const userId = session.metadata.userId ? parseInt(session.metadata.userId) : null;
+  
   console.log('Order IDs to update:', orderIds);
+  console.log('User ID from metadata:', userId);
   
   try {
     // Update orders to paid status - check for connected account if present
@@ -145,6 +156,38 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session, 
     }
 
     console.log(`Orders ${orderIds.join(', ')} marked as paid and stock updated`);
+    
+    // Clear cart items for this user
+    if (userId) {
+      try {
+        // Get product IDs from order items
+        const productIds = orderItems.map(item => item.productId);
+        
+        // Find cart items for this user that match the purchased products
+        const cartItems = await prisma.cartItem.findMany({
+          where: {
+            userId: userId,
+            productId: { in: productIds }
+          }
+        });
+        
+        console.log(`Found ${cartItems.length} cart items to delete for user ${userId}`);
+        
+        if (cartItems.length > 0) {
+          // Delete the cart items
+          const deleteResult = await prisma.cartItem.deleteMany({
+            where: {
+              id: { in: cartItems.map(item => item.id) }
+            }
+          });
+          
+          console.log(`Deleted ${deleteResult.count} cart items after successful checkout`);
+        }
+      } catch (cartError) {
+        console.error('Error clearing cart items after checkout:', cartError);
+        // Don't throw the error as we don't want to fail the whole process
+      }
+    }
     
     // Send order confirmation email for each order
     for (const orderId of orderIds) {
@@ -289,6 +332,95 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent, co
     console.log(`Payment failed for orders ${orderIds.join(', ')}`);
   } catch (error) {
     console.error('Error updating orders after payment intent failed:', error);
+    throw error;
+  }
+}
+
+// Handle failed or expired checkout session
+async function handleCheckoutSessionFailed(session: Stripe.Checkout.Session, connectedAccountId?: string, reason: 'expired' | 'payment_failed' = 'expired') {
+  console.log(`Handling checkout session ${reason}:`, session.id);
+  console.log('Session metadata:', session.metadata);
+  console.log('Session payment status:', session.payment_status);
+  console.log('Session status:', session.status);
+  console.log('Connected account ID:', connectedAccountId || 'None (platform event)');
+  
+  if (!session.metadata?.orderIds) {
+    console.error('No order IDs found in session metadata');
+    return;
+  }
+
+  const orderIds = session.metadata.orderIds.split(',').map(id => parseInt(id));
+  const userId = session.metadata.userId ? parseInt(session.metadata.userId) : null;
+  
+  console.log('Order IDs to update:', orderIds);
+  console.log('User ID from metadata:', userId);
+  
+  try {
+    // Update orders to cancelled status - check for connected account if present
+    const whereClause = connectedAccountId 
+      ? {
+          id: { in: orderIds },
+          stripeSessionId: session.id,
+          stripeAccountId: connectedAccountId
+        }
+      : {
+          id: { in: orderIds },
+          stripeSessionId: session.id
+        };
+    
+    const updateResult = await prisma.order.updateMany({
+      where: whereClause,
+      data: {
+        status: 'cancelled',
+        paymentStatus: reason === 'expired' ? 'expired' : 'failed',
+        updatedAt: new Date()
+      }
+    });
+    
+    console.log('Orders update result:', updateResult);
+    console.log(`Orders ${orderIds.join(', ')} marked as cancelled due to ${reason}`);
+    
+    // Get order items to know which products were in the order
+    const orderItems = await prisma.orderItem.findMany({
+      where: {
+        orderId: { in: orderIds }
+      }
+    });
+    
+    // Clear cart items for this user
+    // We still delete cart items even on payment failure so user can retry with a fresh cart
+    if (userId) {
+      try {
+        // Get product IDs from order items
+        const productIds = orderItems.map(item => item.productId);
+        
+        // Find cart items for this user that match the ordered products
+        const cartItems = await prisma.cartItem.findMany({
+          where: {
+            userId: userId,
+            productId: { in: productIds }
+          }
+        });
+        
+        console.log(`Found ${cartItems.length} cart items to delete for user ${userId}`);
+        
+        if (cartItems.length > 0) {
+          // Delete the cart items
+          const deleteResult = await prisma.cartItem.deleteMany({
+            where: {
+              id: { in: cartItems.map(item => item.id) }
+            }
+          });
+          
+          console.log(`Deleted ${deleteResult.count} cart items after ${reason} checkout`);
+        }
+      } catch (cartError) {
+        console.error(`Error clearing cart items after ${reason} checkout:`, cartError);
+        // Don't throw the error as we don't want to fail the whole process
+      }
+    }
+  } catch (error) {
+    console.error(`Error updating orders after checkout session ${reason}:`, error);
     throw error;
   }
 } 

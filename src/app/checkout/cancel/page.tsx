@@ -24,9 +24,58 @@ const navItems = [
   { name: 'Profile', url: '/profile', icon: User }
 ];
 
+// Define interface for cart items
+interface CartItem {
+  id: number;
+  productId: number;
+  quantity: number;
+  variation?: string | null;
+  product?: {
+    name: string;
+    price: number | string;
+  };
+}
+
 export default function CheckoutCancelPage() {
   // Clear checkout items from session storage when payment is cancelled
   useEffect(() => {
+    // Clear checkout items from session storage
+    const checkoutItems = sessionStorage.getItem('checkoutItems');
+    
+    if (checkoutItems) {
+      try {
+        // Parse the checkout items
+        const items: CartItem[] = JSON.parse(checkoutItems);
+        
+        if (items && items.length > 0) {
+          // Delete the cart items from the database
+          fetch('/api/cart/bulk', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              action: 'delete',
+              itemIds: items.map((item: CartItem) => item.id),
+            }),
+          })
+          .then(response => {
+            if (response.ok) {
+              console.log('Cart items cleared after cancel');
+            } else {
+              console.error('Failed to clear cart items after cancel');
+            }
+          })
+          .catch(error => {
+            console.error('Error clearing cart items after cancel:', error);
+          });
+        }
+      } catch (error) {
+        console.error('Error parsing checkout items:', error);
+      }
+    }
+    
+    // Clear the checkout items from session storage
     sessionStorage.removeItem('checkoutItems');
   }, []);
 
