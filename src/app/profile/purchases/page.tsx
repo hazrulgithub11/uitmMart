@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { Store, ShoppingBag, MessageSquare, ArrowLeft, Loader2, CheckCircle, AlertCircle, X } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'react-hot-toast';
 
 // Cartoon UI Style
 const cartoonStyle = {
@@ -129,10 +130,30 @@ export default function PurchasesPage() {
   // Handle "Pay Now" button click
   const handlePayNow = async (orderId: number) => {
     try {
-      // Redirect to payment page or resume checkout
-      router.push(`/checkout/resume/${orderId}`);
+      // Fetch order details to create checkout session
+      const response = await fetch(`/api/orders/${orderId}/payment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create payment session');
+      }
+      
+      const data = await response.json();
+      
+      // Redirect to Stripe checkout
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL returned');
+      }
     } catch (err) {
       console.error('Error handling payment:', err);
+      toast.error(err instanceof Error ? err.message : 'An error occurred while processing payment');
     }
   };
   

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { CheckCircle, ArrowRight, ShoppingBag, Home, Search, Bell, User, Mail } from 'lucide-react';
+import { CheckCircle, ArrowRight, ShoppingBag, Home,  User, Mail, Star, Store } from 'lucide-react';
 import Link from 'next/link';
 import { NavBar } from "@/components/ui/tubelight-navbar";
 
@@ -19,15 +19,33 @@ const cartoonStyle = {
 // Navigation items
 const navItems = [
   { name: 'Home', url: '/main', icon: Home },
-  { name: 'Search', url: '/search', icon: Search },
-  { name: 'Notifications', url: '/notifications', icon: Bell },
+  { name: 'Offers', url: '/offers', icon: Star },
+    { name: 'Mall', url: '/mall', icon: Store },
   { name: 'Profile', url: '/profile', icon: User }
 ];
+
+// Define interfaces for order items and cart items
+interface OrderItem {
+  productId: string;
+  quantity: number;
+  price: number;
+  name?: string;
+  id?: string;
+}
+
+interface CartItem {
+  id: string;
+  productId: string;
+  quantity: number;
+  price?: number;
+  name?: string;
+}
 
 interface OrderDetails {
   orderNumber: string;
   date?: string;
   createdAt?: string;
+  items?: OrderItem[]; // Replaced any[] with OrderItem[]
 }
 
 // Loading component
@@ -56,6 +74,52 @@ function CheckoutSuccessContent() {
   
   const sessionId = searchParams.get('session_id');
   
+  // Clear items from cart after successful payment
+  const clearCartItems = async (orderItems: OrderItem[]) => {
+    try {
+      if (!orderItems || orderItems.length === 0) return;
+      
+      // Get cart items that match the products in the order
+      const response = await fetch('/api/cart');
+      if (!response.ok) {
+        console.error('Failed to fetch cart items for cleanup');
+        return;
+      }
+      
+      const cartData = await response.json();
+      const cartItems = cartData.cartItems || [];
+      
+      // Find cart items that match the products in the order
+      const cartItemsToDelete = cartItems.filter((cartItem: CartItem) => 
+        orderItems.some((orderItem: OrderItem) => 
+          orderItem.productId === cartItem.productId
+        )
+      ).map((item: CartItem) => item.id);
+      
+      if (cartItemsToDelete.length === 0) return;
+      
+      // Delete the items from cart using bulk delete endpoint
+      const deleteResponse = await fetch('/api/cart/bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'delete',
+          itemIds: cartItemsToDelete,
+        }),
+      });
+      
+      if (!deleteResponse.ok) {
+        console.error('Failed to clear cart items after checkout');
+      } else {
+        console.log('Cart items cleared successfully after checkout');
+      }
+    } catch (err) {
+      console.error('Error clearing cart after checkout:', err);
+    }
+  };
+  
   useEffect(() => {
     // Clear checkout items from session storage
     sessionStorage.removeItem('checkoutItems');
@@ -81,6 +145,11 @@ function CheckoutSuccessContent() {
       
       if (data.order) {
         setOrderDetails(data.order);
+        
+        // Clear cart items after successful payment
+        if (data.order.items) {
+          await clearCartItems(data.order.items);
+        }
       } else {
         // Fallback to simulated data if no order found
         setOrderDetails({

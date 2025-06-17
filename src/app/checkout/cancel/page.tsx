@@ -1,9 +1,10 @@
 'use client'
 
 
-import { XCircle, ArrowLeft, ShoppingCart, Home, Search, Bell, User } from 'lucide-react';
+import { XCircle, ArrowLeft, ShoppingCart, Home, User, Star, Store } from 'lucide-react';
 import Link from 'next/link';
 import { NavBar } from "@/components/ui/tubelight-navbar";
+import { useEffect } from 'react';
 
 // Cartoon UI Style
 const cartoonStyle = {
@@ -18,12 +19,17 @@ const cartoonStyle = {
 // Navigation items
 const navItems = [
   { name: 'Home', url: '/main', icon: Home },
-  { name: 'Search', url: '/search', icon: Search },
-  { name: 'Notifications', url: '/notifications', icon: Bell },
+  { name: 'Offers', url: '/offers', icon: Star },
+    { name: 'Mall', url: '/mall', icon: Store },
   { name: 'Profile', url: '/profile', icon: User }
 ];
 
 export default function CheckoutCancelPage() {
+  // Clear checkout items from session storage when payment is cancelled
+  useEffect(() => {
+    sessionStorage.removeItem('checkoutItems');
+  }, []);
+
   return (
     <div className="min-h-screen bg-[url('/images/backuitm.png')] bg-cover bg-center">
       <NavBar items={navItems} />
@@ -60,8 +66,8 @@ export default function CheckoutCancelPage() {
               </Link>
               
               <Link href="/main" className={`${cartoonStyle.button} py-3 px-6 flex-1 flex items-center justify-center gap-2`}>
-                <ArrowLeft className="h-5 w-5" />
-                <span>Continue Shopping</span>
+                <ArrowLeft className="h-5 w-5 text-black" />
+                <span className='text-black'>Continue Shopping</span>
               </Link>
             </div>
           </div>

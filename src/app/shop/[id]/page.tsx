@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from 'react'
-import { Home, Search, Bell, User, ShoppingCart, Store, Clock, Package, Loader2 } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Home, Search, User, ShoppingCart, Store, Clock, Package, Loader2, Star } from 'lucide-react'
 import { NavBar } from "@/components/ui/tubelight-navbar"
 import Image from 'next/image'
 import { useParams, useRouter } from 'next/navigation'
@@ -10,6 +10,7 @@ import { Product } from '@/hooks/useProducts'
 import { useSafeQuery } from '@/hooks/useSafeQuery'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { format } from 'date-fns'
+import { useOnClickOutside } from '@/hooks/useOnClickOutside'
 
 // Cartoon UI Style
 const cartoonStyle = {
@@ -86,12 +87,20 @@ function ShopPageContent() {
   const router = useRouter();
   const shopId = Number(params.id);
   const [isTimedOut, setIsTimedOut] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<Product[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const searchRef = useRef<HTMLDivElement>(null);
+  
+  // Close suggestions when clicking outside
+  useOnClickOutside(searchRef, () => setShowSuggestions(false));
   
   // Navigation items
   const navItems = [
     { name: 'Home', url: '/main', icon: Home },
-    { name: 'Search', url: '/search', icon: Search },
-    { name: 'Notifications', url: '/notifications', icon: Bell },
+    { name: 'Offers', url: '/offers', icon: Star },
+    { name: 'Mall', url: '/mall', icon: Store },
     { name: 'Profile', url: '/profile', icon: User }
   ];
   
@@ -111,17 +120,60 @@ function ShopPageContent() {
     data: productsData, 
     isLoading: productsLoading 
   } = useSafeQuery<Product[]>(productsApiUrl, { retries: 1 });
-  
-  // Set timeout for loading
+
+  // Fetch all products for search suggestions
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (shopLoading || productsLoading) {
-        setIsTimedOut(true);
+    const fetchAllProducts = async () => {
+      try {
+        const response = await fetch('/api/public/products');
+        if (!response.ok) {
+          throw new Error('Failed to fetch products');
+        }
+        const data = await response.json();
+        setAllProducts(data);
+      } catch (err) {
+        console.error('Error loading products for search suggestions:', err);
       }
-    }, 5000); // 5 seconds timeout
+    };
     
-    return () => clearTimeout(timeoutId);
-  }, [shopLoading, productsLoading]);
+    fetchAllProducts();
+  }, []);
+
+  // Handle search input change
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    
+    // Filter products for suggestions
+    if (value.trim().length > 0) {
+      const filtered = allProducts.filter(product => 
+        product.name.toLowerCase().includes(value.toLowerCase()) || 
+        product.category.toLowerCase().includes(value.toLowerCase()) ||
+        product.description.toLowerCase().includes(value.toLowerCase())
+      ).slice(0, 5); // Limit to 5 suggestions
+      
+      setSuggestions(filtered);
+      setShowSuggestions(true);
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  // Handle search form submission
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      setShowSuggestions(false);
+    }
+  };
+
+  // Handle suggestion click
+  const handleSuggestionClick = (productId: number) => {
+    router.push(`/product/${productId}`);
+    setShowSuggestions(false);
+  };
   
   // Handle navigation to cart
   const navigateToCart = () => {
@@ -138,6 +190,17 @@ function ShopPageContent() {
       return "Unknown";
     }
   };
+  
+  // Set timeout for loading
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (shopLoading || productsLoading) {
+        setIsTimedOut(true);
+      }
+    }, 5000); // 5 seconds timeout
+    
+    return () => clearTimeout(timeoutId);
+  }, [shopLoading, productsLoading]);
   
   // Loading state
   if (shopLoading || productsLoading) {
@@ -212,15 +275,49 @@ function ShopPageContent() {
           </div>
           
           {/* Search bar in the middle */}
-          <div className="relative flex-grow">
-            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-              <Search className="h-5 w-5 text-zinc-400" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search in this shop..."
-              className={`${cartoonStyle.input} w-full py-2 pl-10 pr-4 text-black`}
-            />
+          <div ref={searchRef} className="relative flex-grow">
+            <form onSubmit={handleSearchSubmit} className="relative">
+              <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-zinc-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search in this shop..."
+                value={searchQuery}
+                onChange={handleSearchChange}
+                className={`${cartoonStyle.input} w-full py-2 pl-10 pr-4 text-black`}
+              />
+            </form>
+            
+            {/* Search suggestions */}
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-white border-3 border-black rounded-lg shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] max-h-60 overflow-auto">
+                {suggestions.map((product) => (
+                  <div 
+                    key={product.id}
+                    onClick={() => handleSuggestionClick(product.id)}
+                    className="flex items-center p-3 hover:bg-gray-100 cursor-pointer border-b-2 border-gray-200 last:border-b-0"
+                  >
+                    <div className="w-10 h-10 mr-3 overflow-hidden rounded border-2 border-black flex-shrink-0">
+                      <Image
+                        src={product.images[0] || '/images/placeholder.svg'}
+                        alt={product.name}
+                        width={40}
+                        height={40}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="flex-grow">
+                      <div className="text-sm font-bold text-black truncate">{product.name}</div>
+                      <div className="text-xs text-gray-600">{product.category}</div>
+                    </div>
+                    <div className="text-sm font-semibold text-black">
+                      RM {product.price.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           
           {/* Cart icon on the right */}

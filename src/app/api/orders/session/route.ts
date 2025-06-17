@@ -39,6 +39,18 @@ export async function GET(req: Request) {
             name: true,
             logoUrl: true
           }
+        },
+        items: {
+          select: {
+            id: true,
+            quantity: true,
+            unitPrice: true,
+            totalPrice: true,
+            variation: true,
+            productName: true,
+            productImage: true,
+            productId: true
+          }
         }
       }
     });
