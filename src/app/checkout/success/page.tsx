@@ -92,9 +92,12 @@ function CheckoutSuccessContent() {
       // Find cart items that match the products in the order
       const cartItemsToDelete = cartItems.filter((cartItem: CartItem) => 
         orderItems.some((orderItem: OrderItem) => 
-          orderItem.productId === cartItem.productId
+          // Convert both to string for comparison to handle type mismatches
+          String(orderItem.productId) === String(cartItem.productId)
         )
       ).map((item: CartItem) => item.id);
+      
+      console.log('Found cart items to delete:', cartItemsToDelete.length);
       
       if (cartItemsToDelete.length === 0) return;
       
