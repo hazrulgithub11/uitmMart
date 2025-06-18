@@ -10,6 +10,7 @@ services:
       target: development
     ports:
       - "3000:3000"
+      - "3001:3001"  # Socket.io port
     depends_on:
       - db
     environment:
@@ -27,6 +28,8 @@ services:
       - EMAIL_FROM=${EMAIL_FROM}
       - NEXT_PUBLIC_STRIPE_PUBLIC_KEY=${NEXT_PUBLIC_STRIPE_PUBLIC_KEY}
       - STRIPE_CLIENT_ID=${STRIPE_CLIENT_ID}
+      - SOCKET_PORT=3001
+      - NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_SOCKET_URL:-http://localhost:3001}
     volumes:
       - .:/app
       - /app/node_modules
@@ -37,7 +40,7 @@ services:
         echo 'Running database migrations...' &&
         npx prisma migrate deploy &&
         echo 'Migrations completed, starting app...' &&
-        npx next dev
+        npm run dev & node server.js
       "
 
   # Nginx service

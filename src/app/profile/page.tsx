@@ -616,11 +616,11 @@ export default function ProfilePage() {
                 <span className="font-medium text-black">My Purchases</span>
               </Link>
               
-              <Link href="/notifications" className={`${cartoonStyle.card} flex items-center gap-3`}>
+              <Link href="/chat/conversations" className={`${cartoonStyle.card} flex items-center gap-3`}>
                 <div className="p-2 bg-blue-100 rounded-full border-2 border-black">
                   <Mail size={20} className="text-blue-600" />
                 </div>
-                <span className="font-medium text-black">Notifications</span>
+                <span className="font-medium text-black">Messages</span>
               </Link>
               
               <button 

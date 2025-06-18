@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from 'react'
-import { Home, Search, User, ShoppingCart, Store, Clock, Package, Loader2, Star } from 'lucide-react'
+import { Home, Search, User, ShoppingCart, Store, Clock, Package, Loader2, Star, MessageSquare } from 'lucide-react'
 import { NavBar } from "@/components/ui/tubelight-navbar"
 import Image from 'next/image'
 import { useParams, useRouter } from 'next/navigation'
@@ -367,6 +367,15 @@ function ShopPageContent() {
               {description && (
                 <p className="text-gray-700 mt-2">{description}</p>
               )}
+              
+              {/* Contact Seller Button */}
+              <button 
+                onClick={() => router.push(`/chat?shopId=${shopId}&shop=${encodeURIComponent(name)}${logoUrl ? `&logo=${encodeURIComponent(logoUrl)}` : ''}`)}
+                className={`${cartoonStyle.buttonPrimary} mt-4 px-6 py-2 flex items-center gap-2`}
+              >
+                <MessageSquare className="h-4 w-4" />
+                Contact Seller
+              </button>
             </div>
           </div>
         </div>

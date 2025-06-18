@@ -25,6 +25,11 @@ model User {
   shop         Shop?
   orders       Order[]    @relation("BuyerOrders")
   ratings      Rating[]   // Added relation to Rating
+  
+  // Chat relations
+  sentMessages     ChatMessage[] @relation("SentMessages")
+  buyerChats       Chat[]        @relation("BuyerChats")
+  sellerChats      Chat[]        @relation("SellerChats")
 }
 
 model Shop {
@@ -44,6 +49,9 @@ model Shop {
   products        Product[]
   seller          User      @relation(fields: [sellerId], references: [id], onDelete: Cascade)
   orders          Order[]   @relation("SellerOrders")
+  
+  // Chat relation
+  chats           Chat[]
 }
 
 model Product {
@@ -204,4 +212,45 @@ model Rating {
   @@index([userId])
   @@index([productId])
   @@index([orderId])
+}
+
+// New Chat models
+model Chat {
+  id          Int           @id @default(autoincrement())
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  buyerId     Int
+  sellerId    Int
+  shopId      Int
+  lastMessageAt DateTime    @default(now())
+  
+  // Relations
+  buyer       User          @relation("BuyerChats", fields: [buyerId], references: [id], onDelete: Cascade)
+  seller      User          @relation("SellerChats", fields: [sellerId], references: [id], onDelete: Cascade)
+  shop        Shop          @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  messages    ChatMessage[]
+  
+  @@unique([buyerId, shopId])
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([shopId])
+  @@index([lastMessageAt])
+}
+
+model ChatMessage {
+  id        Int      @id @default(autoincrement())
+  content   String
+  createdAt DateTime @default(now())
+  read      Boolean  @default(false)
+  chatId    Int
+  senderId  Int
+  
+  // Relations
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender    User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  
+  @@index([chatId])
+  @@index([senderId])
+  @@index([read])
+  @@index([createdAt])
 }

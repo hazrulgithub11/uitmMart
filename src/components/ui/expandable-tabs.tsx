@@ -5,17 +5,22 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useOnClickOutside } from "usehooks-ts";
 import { cn } from "@/lib/utils";
 import { LucideIcon } from "lucide-react";
+import Link from "next/link";
 
 interface Tab {
   title: string;
   icon: LucideIcon;
   type?: never;
+  href?: string;
+  badge?: number;
 }
 
 interface Separator {
   type: "separator";
   title?: never;
   icon?: never;
+  href?: never;
+  badge?: never;
 }
 
 type TabItem = Tab | Separator;
@@ -71,6 +76,77 @@ export function ExpandableTabs({
     <div className="mx-1 h-[24px] w-[1.2px] bg-border" aria-hidden="true" />
   );
 
+  const TabButton = ({ tab, index }: { tab: Tab, index: number }) => {
+    const Icon = tab.icon;
+    const isSelected = selected === index;
+    
+    const content = (
+      <>
+        <div className="relative">
+          <Icon size={20} />
+          {tab.badge && (
+            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+              {tab.badge > 9 ? '9+' : tab.badge}
+            </span>
+          )}
+        </div>
+        <AnimatePresence initial={false}>
+          {isSelected && (
+            <motion.span
+              variants={spanVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={transition}
+              className="overflow-hidden"
+            >
+              {tab.title}
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </>
+    );
+    
+    const buttonClasses = cn(
+      "relative flex items-center rounded-xl px-4 py-2 text-sm font-medium transition-colors duration-300",
+      isSelected
+        ? cn("bg-muted", activeColor)
+        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+    );
+    
+    if (tab.href) {
+      return (
+        <Link href={tab.href}>
+          <motion.div
+            variants={buttonVariants}
+            initial={false}
+            animate="animate"
+            custom={isSelected}
+            onClick={() => handleSelect(index)}
+            transition={transition}
+            className={buttonClasses}
+          >
+            {content}
+          </motion.div>
+        </Link>
+      );
+    }
+    
+    return (
+      <motion.button
+        variants={buttonVariants}
+        initial={false}
+        animate="animate"
+        custom={isSelected}
+        onClick={() => handleSelect(index)}
+        transition={transition}
+        className={buttonClasses}
+      >
+        {content}
+      </motion.button>
+    );
+  };
+
   return (
     <div
       ref={outsideClickRef}
@@ -84,40 +160,7 @@ export function ExpandableTabs({
           return <Separator key={`separator-${index}`} />;
         }
 
-        const Icon = tab.icon;
-        return (
-          <motion.button
-            key={tab.title}
-            variants={buttonVariants}
-            initial={false}
-            animate="animate"
-            custom={selected === index}
-            onClick={() => handleSelect(index)}
-            transition={transition}
-            className={cn(
-              "relative flex items-center rounded-xl px-4 py-2 text-sm font-medium transition-colors duration-300",
-              selected === index
-                ? cn("bg-muted", activeColor)
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            )}
-          >
-            <Icon size={20} />
-            <AnimatePresence initial={false}>
-              {selected === index && (
-                <motion.span
-                  variants={spanVariants}
-                  initial="initial"
-                  animate="animate"
-                  exit="exit"
-                  transition={transition}
-                  className="overflow-hidden"
-                >
-                  {tab.title}
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </motion.button>
-        );
+        return <TabButton key={tab.title} tab={tab} index={index} />;
       })}
     </div>
   );

@@ -2,10 +2,10 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { useSession, signOut } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Home, Package, ShoppingBag, Settings, User, LogOut, Store, CreditCard } from 'lucide-react';
+import { Home, Package, ShoppingBag, Settings, User, LogOut, Store, CreditCard, MessageSquare } from 'lucide-react';
 
 // Cartoon UI Style
 const cartoonStyle = {
@@ -22,6 +22,20 @@ interface ShopData {
   logoUrl: string | null;
 }
 
+// Interface for conversation objects
+interface Conversation {
+  id: number;
+  unreadCount?: number;
+  lastMessageAt: string;
+  messages: Array<{
+    id: number;
+    content: string;
+    createdAt: string;
+    read: boolean;
+    senderId: number;
+  }>;
+}
+
 export default function SellerLayout({
   children,
 }: {
@@ -29,9 +43,11 @@ export default function SellerLayout({
 }) {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const pathname = usePathname();
   const [shopData, setShopData] = useState<ShopData>({ name: 'My Shop', logoUrl: null });
   const [loading, setLoading] = useState(true);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   const fetchShopData = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -58,6 +74,24 @@ export default function SellerLayout({
     }
   }, [session?.user?.id]);
 
+  // Fetch unread message count
+  const fetchUnreadMessages = useCallback(async () => {
+    if (!session?.user?.id) return;
+    
+    try {
+      const response = await fetch('/api/chat/conversations');
+      if (response.ok) {
+        const conversations = await response.json();
+        const totalUnread = conversations.reduce((total: number, conversation: Conversation) => {
+          return total + (conversation.unreadCount || 0);
+        }, 0);
+        setUnreadMessages(totalUnread);
+      }
+    } catch (error) {
+      console.error('Error fetching unread messages:', error);
+    }
+  }, [session?.user?.id]);
+
   useEffect(() => {
     // Check if user is authenticated and is a seller
     if (status === 'unauthenticated') {
@@ -67,11 +101,17 @@ export default function SellerLayout({
         router.push('/main');
       } else {
         setLoading(false);
-        // Fetch shop data
+        // Fetch shop data and unread messages
         fetchShopData();
+        fetchUnreadMessages();
+        
+        // Set up interval to periodically check for new messages
+        const intervalId = setInterval(fetchUnreadMessages, 60000); // Check every minute
+        
+        return () => clearInterval(intervalId);
       }
     }
-  }, [status, session, router, fetchShopData]);
+  }, [status, session, router, fetchShopData, fetchUnreadMessages]);
 
   // Handler for logout confirmation
   const handleLogout = () => {
@@ -104,6 +144,7 @@ export default function SellerLayout({
     { href: '/seller', label: 'Home', icon: Home },
     { href: '/seller/products', label: 'Products', icon: Package },
     { href: '/seller/orders', label: 'Orders', icon: ShoppingBag },
+    { href: '/seller/chat', label: 'Messages', icon: MessageSquare },
     { href: '/seller/shop-settings', label: 'Shop Settings', icon: Settings },
     { href: '/seller/account-settings', label: 'Account', icon: User },
     { href: '/seller/payment', label: 'Payment', icon: CreditCard },
@@ -138,16 +179,26 @@ export default function SellerLayout({
         </div>
 
         <div className="space-y-1">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex items-center rounded-lg px-4 py-3 mb-2 transition-all hover:translate-x-1 text-black font-bold bg-white border-3 border-black shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,0.8)] active:translate-y-1 active:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
-            >
-              <item.icon className="mr-3 h-5 w-5" />
-              {item.label}
-            </Link>
-          ))}
+          {navItems.map((item) => {
+            const isActive = pathname === item.href;
+            const showBadge = item.label === 'Messages' && unreadMessages > 0;
+            
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center rounded-lg px-4 py-3 mb-2 transition-all hover:translate-x-1 text-black font-bold bg-white border-3 border-black shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,0.8)] active:translate-y-1 active:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] ${isActive ? 'bg-blue-100' : ''}`}
+              >
+                <item.icon className="mr-3 h-5 w-5" />
+                <span className="flex-1">{item.label}</span>
+                {showBadge && (
+                  <div className="rounded-full bg-red-500 text-white text-xs font-bold h-5 w-5 flex items-center justify-center border-2 border-black">
+                    {unreadMessages > 9 ? '9+' : unreadMessages}
+                  </div>
+                )}
+              </Link>
+            );
+          })}
 
           <hr className="my-4 border-2 border-black" />
 
