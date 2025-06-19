@@ -29,7 +29,9 @@ services:
       - NEXT_PUBLIC_STRIPE_PUBLIC_KEY=${NEXT_PUBLIC_STRIPE_PUBLIC_KEY}
       - STRIPE_CLIENT_ID=${STRIPE_CLIENT_ID}
       - SOCKET_PORT=3001
-      - NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_SOCKET_URL:-'https://uitmmart.site'}
+      - SOCKET_HOST=0.0.0.0
+      - SOCKET_PATH=/socket.io
+      - NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_SOCKET_URL:-https://uitmmart.site}
     volumes:
       - .:/app
       - /app/node_modules
@@ -40,7 +42,10 @@ services:
         echo 'Running database migrations...' &&
         npx prisma migrate deploy &&
         echo 'Migrations completed, starting app...' &&
-        npm run dev & node server.js
+        npm run dev & 
+        echo 'Starting Socket.io server...' &&
+        node server.js &
+        wait
       "
 
   # Nginx service
