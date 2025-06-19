@@ -3,7 +3,9 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   try {
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://uitmmart.site';
-    const response = await fetch(`${socketUrl}/health`, {
+    const healthUrl = `${socketUrl.replace(/['"]+/g, '')}/health`;
+    
+    const response = await fetch(healthUrl, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

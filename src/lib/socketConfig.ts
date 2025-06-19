@@ -3,6 +3,8 @@ import { io, Socket } from 'socket.io-client';
 // Socket.io server URL - use environment variable or fallback to relative path
 // Using relative path allows it to work with the same domain in production
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://uitmmart.site';
+// Ensure no extra quotes in the URL
+const cleanSocketUrl = SOCKET_URL.replace(/['"]+/g, '');
 
 // Socket.io connection options
 const socketOptions = {
@@ -21,8 +23,8 @@ let socket: Socket | null = null;
 // Initialize socket connection
 export const initializeSocket = (): Socket => {
   if (!socket) {
-    console.log('[SOCKET] Connecting to:', SOCKET_URL);
-    socket = io(SOCKET_URL, socketOptions);
+    console.log('[SOCKET] Connecting to:', cleanSocketUrl);
+    socket = io(cleanSocketUrl, socketOptions);
     
     // Set up default listeners
     socket.on('connect', () => {
