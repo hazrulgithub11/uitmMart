@@ -19,6 +19,20 @@ const cartoonStyle = {
   input: "bg-white border-3 border-black rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
 };
 
+// Check if a discount is currently active
+const isDiscountActive = (product: Product) => {
+  if (!product?.discountPercentage) return false;
+  
+  const now = new Date();
+  const startDate = product.discountStartDate ? new Date(product.discountStartDate) : null;
+  const endDate = product.discountEndDate ? new Date(product.discountEndDate) : null;
+  
+  if (startDate && now < startDate) return false;
+  if (endDate && now > endDate) return false;
+  
+  return true;
+};
+
 // Define interfaces for the cart data
 interface Product {
   id: number;
@@ -30,6 +44,10 @@ interface Product {
   shop: Shop;
   category?: string;
   description?: string;
+  discountPercentage?: number | null;
+  discountedPrice?: number | string | null;
+  discountStartDate?: string | null;
+  discountEndDate?: string | null;
 }
 
 interface Shop {
@@ -131,9 +149,13 @@ export default function CartPage() {
   }
   
   // Calculate total price for an item
-  const calculateTotal = (price: unknown, quantity: number): string => {
-    const numericPrice = safeParseFloat(price);
-    return (numericPrice * quantity).toFixed(2);
+  const calculateTotal = (item: CartItem): string => {
+    // Use discounted price if available and active, otherwise use regular price
+    const price = item.product.discountPercentage && isDiscountActive(item.product)
+      ? safeParseFloat(item.product.discountedPrice) 
+      : safeParseFloat(item.product.price);
+    
+    return (price * item.quantity).toFixed(2);
   }
   
   // Get image URL with fallback
@@ -366,7 +388,12 @@ export default function CartPage() {
     selectedItems.forEach(itemId => {
       const item = cartItems.find(item => item.id === itemId)
       if (item) {
-        total += safeParseFloat(item.product.price) * item.quantity;
+        // Use discounted price if available and active
+        const price = item.product.discountPercentage && isDiscountActive(item.product)
+          ? safeParseFloat(item.product.discountedPrice) 
+          : safeParseFloat(item.product.price);
+        
+        total += price * item.quantity;
       }
     })
     return total.toFixed(2)
@@ -532,10 +559,23 @@ export default function CartPage() {
                       <div className="text-xs text-gray-600">{product.category}</div>
                     </div>
                     <div className="text-sm font-semibold text-black">
-                      RM {typeof product.price === 'number' 
-                        ? product.price.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                        : safeParseFloat(product.price).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                      }
+                      {product.discountPercentage && isDiscountActive(product) ? (
+                        <div>
+                          <span className="text-gray-500 line-through text-xs">
+                            RM {safeParseFloat(product.price).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                          <div className="text-red-500">
+                            RM {safeParseFloat(product.discountedPrice).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          RM {typeof product.price === 'number' 
+                            ? product.price.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                            : safeParseFloat(product.price).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                          }
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -659,7 +699,20 @@ export default function CartPage() {
                         <div className="grid grid-cols-3 md:hidden gap-2">
                           <div>
                               <p className="text-xs text-gray-600">Unit Price</p>
-                              <p className="text-black">RM{safeParseFloat(item.product.price).toFixed(2)}</p>
+                              {item.product.discountPercentage && isDiscountActive(item.product) ? (
+                                <>
+                                  <p className="text-gray-500 line-through text-xs">
+                                    RM{safeParseFloat(item.product.price).toFixed(2)}
+                                  </p>
+                                  <p className="text-black">
+                                    RM{safeParseFloat(item.product.discountedPrice).toFixed(2)}
+                                  </p>
+                                </>
+                              ) : (
+                                <p className="text-black">
+                                  RM{safeParseFloat(item.product.price).toFixed(2)}
+                                </p>
+                              )}
                           </div>
                           <div>
                               <p className="text-xs text-gray-600">Quantity</p>
@@ -670,14 +723,27 @@ export default function CartPage() {
                           <div>
                               <p className="text-xs text-gray-600">Total</p>
                             <p className="text-red-500 font-medium">
-                                RM{calculateTotal(item.product.price, item.quantity)}
+                                RM{calculateTotal(item)}
                             </p>
                           </div>
                         </div>
                         
                         {/* Unit Price (Desktop only) */}
                         <div className="hidden md:block md:col-span-2 text-center">
-                            <p className="text-black">RM{safeParseFloat(item.product.price).toFixed(2)}</p>
+                            {item.product.discountPercentage && isDiscountActive(item.product) ? (
+                              <>
+                                <p className="text-gray-500 line-through text-xs">
+                                  RM{safeParseFloat(item.product.price).toFixed(2)}
+                                </p>
+                                <p className="text-black">
+                                  RM{safeParseFloat(item.product.discountedPrice).toFixed(2)}
+                                </p>
+                              </>
+                            ) : (
+                              <p className="text-black">
+                                RM{safeParseFloat(item.product.price).toFixed(2)}
+                              </p>
+                            )}
                         </div>
                         
                         {/* Quantity (Desktop only) */}
@@ -707,7 +773,7 @@ export default function CartPage() {
                         
                         {/* Total Price (Desktop only) */}
                         <div className="hidden md:block md:col-span-2 text-center text-red-500 font-medium">
-                            RM{calculateTotal(item.product.price, item.quantity)}
+                            RM{calculateTotal(item)}
                         </div>
                         
                         {/* Actions */}

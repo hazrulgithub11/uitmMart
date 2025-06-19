@@ -240,6 +240,12 @@ export default function CategoryPage() {
                       height={160}
                       className="w-full h-full object-cover"
                     />
+                    {/* Discount Badge */}
+                    {product.discountPercentage && (
+                      <div className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full border-2 border-white">
+                        {product.discountPercentage}% OFF
+                      </div>
+                    )}
                   </div>
                   <div className="p-3">
                     <h3 className="text-sm text-black font-bold truncate">{product.name}</h3>
@@ -248,9 +254,20 @@ export default function CategoryPage() {
                         {product.category}
                       </div>
                     </div>
-                    <div className="mt-1 text-black font-semibold">
-                      RM {product.price.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </div>
+                    {product.discountPercentage ? (
+                      <div className="mt-1">
+                        <span className="text-gray-500 text-xs line-through block">
+                          RM {product.price.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        <span className="text-red-500 font-semibold">
+                          RM {Number(product.discountedPrice).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="mt-1 text-black font-semibold">
+                        RM {product.price.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                    )}
                   </div>
                 </a>
               ))}

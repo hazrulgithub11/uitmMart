@@ -9,6 +9,7 @@ export async function GET(req: NextRequest) {
     const category = url.searchParams.get('category');
     const searchQuery = url.searchParams.get('search');
     const shopIdParam = url.searchParams.get('shopId');
+    const discounted = url.searchParams.get('discounted');
     
     // Build filter based on search params
     const whereClause: Record<string, unknown> = {
@@ -33,6 +34,35 @@ export async function GET(req: NextRequest) {
       if (!isNaN(shopId)) {
         whereClause.shopId = shopId;
       }
+    }
+    
+    // Filter for discounted products if requested
+    if (discounted === 'true') {
+      whereClause.discountPercentage = {
+        not: null
+      };
+      
+      // Check if discount is currently active (based on dates)
+      const now = new Date();
+      
+      // Either no start date or start date is in the past
+      const startDateCondition = {
+        OR: [
+          { discountStartDate: null },
+          { discountStartDate: { lte: now } }
+        ]
+      };
+      
+      // Either no end date or end date is in the future
+      const endDateCondition = {
+        OR: [
+          { discountEndDate: null },
+          { discountEndDate: { gte: now } }
+        ]
+      };
+      
+      // Combine date conditions with existing where clause
+      whereClause.AND = [startDateCondition, endDateCondition];
     }
     
     const products = await prisma.product.findMany({

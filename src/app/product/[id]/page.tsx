@@ -24,6 +24,20 @@ const cartoonStyle = {
   input: "bg-white border-3 border-black rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
 };
 
+// Check if a discount is currently active
+const isDiscountActive = (product: Product) => {
+  if (!product?.discountPercentage) return false;
+  
+  const now = new Date();
+  const startDate = product.discountStartDate ? new Date(product.discountStartDate) : null;
+  const endDate = product.discountEndDate ? new Date(product.discountEndDate) : null;
+  
+  if (startDate && now < startDate) return false;
+  if (endDate && now > endDate) return false;
+  
+  return true;
+};
+
 // Define type for product with shop included
 interface ProductWithShop extends Product {
   shop: Shop & {
@@ -500,10 +514,42 @@ function ProductDetailContent() {
                 {/* Price */}
                 <div className="mb-6">
                   <div className="flex items-center gap-3">
-                    <span className="text-3xl font-bold text-red-500">
-                      RM{product.price.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
+                    {product.discountPercentage && isDiscountActive(product) ? (
+                      <>
+                        <div className="flex flex-col">
+                          <span className="text-gray-500 line-through">
+                            RM{product.price.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                          <span className="text-3xl font-bold text-red-500">
+                            RM{Number(product.discountedPrice).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <span className="px-2 py-1 bg-red-100 text-red-800 text-sm font-bold rounded-full border-2 border-red-800">
+                          {product.discountPercentage}% OFF
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-3xl font-bold text-red-500">
+                        RM{product.price.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    )}
                   </div>
+                  
+                  {/* Display discount status if there is a discount but not active */}
+                  {product.discountPercentage && !isDiscountActive(product) && (
+                    <div className="mt-2">
+                      {product.discountStartDate && new Date(product.discountStartDate) > new Date() ? (
+                        <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded-md border border-blue-800">
+                          Discount scheduled: {new Date(product.discountStartDate).toLocaleDateString()}
+                          {product.discountEndDate && ` - ${new Date(product.discountEndDate).toLocaleDateString()}`}
+                        </span>
+                      ) : product.discountEndDate && new Date(product.discountEndDate) < new Date() ? (
+                        <span className="text-sm bg-gray-100 text-gray-800 px-2 py-1 rounded-md border border-gray-800">
+                          Discount expired: {new Date(product.discountEndDate).toLocaleDateString()}
+                        </span>
+                      ) : null}
+                    </div>
+                  )}
                   
                   <div className="mt-1">
                     <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded border-2 border-black font-bold">

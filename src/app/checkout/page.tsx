@@ -8,7 +8,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { toast } from 'react-hot-toast'
-import { Product } from '@/hooks/useProducts'
+import { Product as ProductType } from '@/hooks/useProducts'
 import { useOnClickOutside } from '@/hooks/useOnClickOutside'
 
 // Cartoon UI Style
@@ -19,6 +19,28 @@ const cartoonStyle = {
   buttonPrimary: "bg-blue-500 text-white border-3 border-black rounded-lg shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,0.8)] transition-all active:translate-y-1 active:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]",
   buttonDanger: "bg-red-500 text-white border-3 border-black rounded-lg shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,0.8)] transition-all active:translate-y-1 active:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]",
   input: "bg-white border-3 border-black rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+};
+
+// Define a type for products with discount fields
+type ProductWithDiscount = {
+  discountPercentage?: number | null;
+  discountStartDate?: string | Date | null;
+  discountEndDate?: string | Date | null;
+  [key: string]: unknown;
+};
+
+// Check if a discount is currently active
+const isDiscountActive = (product: ProductWithDiscount) => {
+  if (!product.discountPercentage) return false;
+  
+  const now = new Date();
+  const startDate = product.discountStartDate ? new Date(product.discountStartDate) : null;
+  const endDate = product.discountEndDate ? new Date(product.discountEndDate) : null;
+  
+  if (startDate && now < startDate) return false;
+  if (endDate && now > endDate) return false;
+  
+  return true;
 };
 
 // Define an interface for address data
@@ -47,6 +69,10 @@ interface CheckoutItem {
     price: number | string
     name: string
     images?: string[]
+    discountPercentage?: number | null
+    discountedPrice?: number | string | null
+    discountStartDate?: string | Date | null
+    discountEndDate?: string | Date | null
     shop: {
       id: number
       name: string
@@ -66,9 +92,9 @@ export default function CheckoutPage() {
   
   // State for search functionality
   const [searchQuery, setSearchQuery] = useState('');
-  const [suggestions, setSuggestions] = useState<Product[]>([]);
+  const [suggestions, setSuggestions] = useState<ProductType[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [allProducts, setAllProducts] = useState<ProductType[]>([]);
   const searchRef = useRef<HTMLDivElement>(null);
 
   // Close suggestions when clicking outside
@@ -163,9 +189,17 @@ export default function CheckoutPage() {
   // Calculate total price for items
   const calculateSubtotal = () => {
     return checkoutItems.reduce((sum, item) => {
-      const price = typeof item.product.price === 'number' 
-        ? item.product.price 
-        : parseFloat(String(item.product.price))
+      // Check if discount is active before using discounted price
+      const hasActiveDiscount = item.product.discountPercentage && isDiscountActive(item.product);
+      
+      const price = hasActiveDiscount
+        ? (typeof item.product.discountedPrice === 'number'
+            ? item.product.discountedPrice
+            : parseFloat(String(item.product.discountedPrice)))
+        : (typeof item.product.price === 'number' 
+            ? item.product.price 
+            : parseFloat(String(item.product.price)))
+      
       return sum + (price * item.quantity)
     }, 0).toFixed(2)
   }
@@ -426,10 +460,29 @@ export default function CheckoutPage() {
                       <div className="text-xs text-gray-600">{product.category}</div>
                     </div>
                     <div className="text-sm font-semibold text-black">
-                      RM {typeof product.price === 'number' 
-                        ? product.price.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                        : parseFloat(String(product.price)).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                      }
+                      {product.discountPercentage && isDiscountActive(product as unknown as ProductWithDiscount) ? (
+                        <div>
+                          <span className="text-gray-500 line-through text-xs">
+                            RM {typeof product.price === 'number' 
+                              ? product.price.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                              : parseFloat(String(product.price)).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                            }
+                          </span>
+                          <div className="text-red-500">
+                            RM {typeof product.discountedPrice === 'number' 
+                              ? product.discountedPrice.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                              : parseFloat(String(product.discountedPrice)).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                            }
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          RM {typeof product.price === 'number' 
+                            ? product.price.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                            : parseFloat(String(product.price)).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                          }
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -534,11 +587,6 @@ export default function CheckoutPage() {
             {/* Products List */}
             <div className="divide-y-3 divide-black">
               {checkoutItems.map((item) => {
-                // Calculate safe price
-                const safePrice = typeof item.product.price === 'number' 
-                  ? item.product.price 
-                  : parseFloat(String(item.product.price))
-                  
                 // Get product image
                 const productImage = item.product.images && item.product.images.length > 0 
                   ? item.product.images[0] 
@@ -598,7 +646,26 @@ export default function CheckoutPage() {
                     {/* Pricing */}
                     <div className="col-span-2 text-right">
                         <div className="md:hidden text-gray-600 text-xs mb-1">Unit Price</div>
-                        <p className="text-black">RM{safePrice.toFixed(2)}</p>
+                        {item.product.discountPercentage && isDiscountActive(item.product) ? (
+                          <>
+                            <p className="text-gray-500 line-through text-xs">
+                              RM{typeof item.product.price === 'number' 
+                                ? item.product.price.toFixed(2) 
+                                : parseFloat(String(item.product.price)).toFixed(2)}
+                            </p>
+                            <p className="text-black">
+                              RM{typeof item.product.discountedPrice === 'number' 
+                                ? item.product.discountedPrice.toFixed(2) 
+                                : parseFloat(String(item.product.discountedPrice)).toFixed(2)}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-black">
+                            RM{typeof item.product.price === 'number' 
+                              ? item.product.price.toFixed(2) 
+                              : parseFloat(String(item.product.price)).toFixed(2)}
+                          </p>
+                        )}
                     </div>
                     
                     <div className="col-span-2 text-center">
@@ -608,7 +675,11 @@ export default function CheckoutPage() {
                     
                     <div className="col-span-2 text-right">
                         <div className="md:hidden text-gray-600 text-xs mb-1">Item Subtotal</div>
-                        <p className="text-red-500 font-bold">RM{(safePrice * item.quantity).toFixed(2)}</p>
+                        <p className="text-red-500 font-bold">
+                          RM{item.product.discountPercentage && isDiscountActive(item.product)
+                            ? (parseFloat(String(item.product.discountedPrice)) * item.quantity).toFixed(2)
+                            : (parseFloat(String(item.product.price)) * item.quantity).toFixed(2)}
+                        </p>
                       </div>
                     </div>
                   </div>

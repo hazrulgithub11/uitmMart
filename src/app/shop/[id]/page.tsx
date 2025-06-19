@@ -51,23 +51,58 @@ const ProductCard = ({ product }: { product: Product }) => {
           fill
           className="object-cover"
         />
+        {/* Discount Badge */}
+        {product.discountPercentage && (
+          <div className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full border-2 border-white">
+            {product.discountPercentage}% OFF
+          </div>
+        )}
       </div>
       
       {/* Product Info */}
       <div className="p-4">
         <h3 className="font-medium line-clamp-2 text-black">{product.name}</h3>
-        <p className="text-red-500 font-bold mt-2">
-          RM{(() => {
-            try {
-              return typeof product.price === 'number' 
-                ? product.price.toFixed(2) 
-                : parseFloat(String(product.price)).toFixed(2);
-            } catch (error) {
-              console.error("Error formatting price:", error);
-              return "0.00"; // Fallback price
-            }
-          })()}
-        </p>
+        {product.discountPercentage ? (
+          <div className="mt-2">
+            <p className="text-gray-500 text-sm line-through">
+              RM{(() => {
+                try {
+                  return typeof product.price === 'number' 
+                    ? product.price.toFixed(2) 
+                    : parseFloat(String(product.price)).toFixed(2);
+                } catch (error) {
+                  console.error("Error formatting price:", error);
+                  return "0.00"; // Fallback price
+                }
+              })()}
+            </p>
+            <p className="text-red-500 font-bold">
+              RM{(() => {
+                try {
+                  return typeof product.discountedPrice === 'number' 
+                    ? product.discountedPrice.toFixed(2) 
+                    : parseFloat(String(product.discountedPrice)).toFixed(2);
+                } catch (error) {
+                  console.error("Error formatting discounted price:", error);
+                  return "0.00"; // Fallback price
+                }
+              })()}
+            </p>
+          </div>
+        ) : (
+          <p className="text-red-500 font-bold mt-2">
+            RM{(() => {
+              try {
+                return typeof product.price === 'number' 
+                  ? product.price.toFixed(2) 
+                  : parseFloat(String(product.price)).toFixed(2);
+              } catch (error) {
+                console.error("Error formatting price:", error);
+                return "0.00"; // Fallback price
+              }
+            })()}
+          </p>
+        )}
         <div className="flex justify-between items-center mt-2">
           <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded border-2 border-blue-800">
             {product.category}

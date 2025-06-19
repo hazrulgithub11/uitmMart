@@ -68,6 +68,10 @@ model Product {
   shopId          Int
   stripePriceId   String?
   stripeProductId String?
+  discountPercentage Int?      // Optional percentage discount (0-100)
+  discountedPrice    Decimal?  @db.Decimal(10, 2) // Pre-calculated discounted price
+  discountStartDate  DateTime? // When discount starts
+  discountEndDate    DateTime? // When discount ends
   cartItems       CartItem[]
   shop            Shop        @relation(fields: [shopId], references: [id], onDelete: Cascade)
   orderItems      OrderItem[]

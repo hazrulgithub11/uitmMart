@@ -56,14 +56,91 @@ export async function POST(req: Request) {
     case 'payment_intent.succeeded': {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
       console.log(`PaymentIntent ${paymentIntent.id} succeeded`);
-      // Handle successful payment
+      
+      try {
+        // Extract order IDs from metadata
+        if (paymentIntent.metadata?.orderIds) {
+          const orderIds = paymentIntent.metadata.orderIds.split(',').map(id => parseInt(id));
+          
+          // Update all associated orders
+          await prisma.order.updateMany({
+            where: {
+              id: { in: orderIds }
+            },
+            data: {
+              paymentStatus: 'paid',
+              status: 'processing', // Move from pending to processing
+              updatedAt: new Date()
+            }
+          });
+          
+          console.log(`Updated payment status for orders: ${orderIds.join(', ')}`);
+        }
+      } catch (error) {
+        console.error('Error updating order payment status:', error);
+      }
       break;
     }
 
     case 'payment_intent.payment_failed': {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
       console.log(`PaymentIntent ${paymentIntent.id} failed`);
-      // Handle failed payment
+      
+      try {
+        // Extract order IDs from metadata
+        if (paymentIntent.metadata?.orderIds) {
+          const orderIds = paymentIntent.metadata.orderIds.split(',').map(id => parseInt(id));
+          
+          // Update all associated orders
+          await prisma.order.updateMany({
+            where: {
+              id: { in: orderIds }
+            },
+            data: {
+              paymentStatus: 'failed',
+              updatedAt: new Date()
+            }
+          });
+          
+          console.log(`Updated payment status to failed for orders: ${orderIds.join(', ')}`);
+        }
+      } catch (error) {
+        console.error('Error updating order payment status:', error);
+      }
+      break;
+    }
+
+    // Handle checkout session completion
+    case 'checkout.session.completed': {
+      const session = event.data.object as Stripe.Checkout.Session;
+      console.log(`Checkout session ${session.id} completed`);
+      
+      try {
+        // Find orders with this session ID
+        const orders = await prisma.order.findMany({
+          where: {
+            stripeSessionId: session.id
+          }
+        });
+        
+        if (orders.length > 0) {
+          // Update all associated orders
+          await prisma.order.updateMany({
+            where: {
+              stripeSessionId: session.id
+            },
+            data: {
+              paymentStatus: 'paid',
+              status: 'processing', // Move from pending to processing
+              updatedAt: new Date()
+            }
+          });
+          
+          console.log(`Updated payment status for orders with session ID: ${session.id}`);
+        }
+      } catch (error) {
+        console.error('Error updating order status for completed checkout session:', error);
+      }
       break;
     }
 

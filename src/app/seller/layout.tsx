@@ -5,7 +5,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Home, Package, ShoppingBag, Settings, User, LogOut, Store, CreditCard, MessageSquare } from 'lucide-react';
+import { Home, Package, ShoppingBag, Settings, User, LogOut, Store, CreditCard, MessageSquare, PercentSquare } from 'lucide-react';
 
 // Cartoon UI Style
 const cartoonStyle = {
@@ -144,6 +144,7 @@ export default function SellerLayout({
     { href: '/seller', label: 'Home', icon: Home },
     { href: '/seller/products', label: 'Products', icon: Package },
     { href: '/seller/orders', label: 'Orders', icon: ShoppingBag },
+    { href: '/seller/discount', label: 'Discounts', icon: PercentSquare },
     { href: '/seller/chat', label: 'Messages', icon: MessageSquare },
     { href: '/seller/shop-settings', label: 'Shop Settings', icon: Settings },
     { href: '/seller/account-settings', label: 'Account', icon: User },

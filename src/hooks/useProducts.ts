@@ -14,13 +14,17 @@ export interface Product {
   createdAt: string;
   updatedAt: string;
   shopId: number;
+  discountPercentage?: number | null;
+  discountedPrice?: number | null;
+  discountStartDate?: string | null;
+  discountEndDate?: string | null;
 }
 
 export interface ProductFormData {
   name: string;
   description: string;
-  price: string;
-  stock: string;
+  price: string | number;
+  stock: string | number;
   category: string;
   images: string[];
 }

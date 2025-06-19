@@ -221,11 +221,16 @@ export default function EditProductPage() {
       return;
     }
     
-    // Call the updateProduct function from our hook
-    const result = await updateProduct(productId, {
+    // Convert string values to appropriate types
+    const processedFormData = {
       ...formData,
+      price: parseFloat(formData.price),
+      stock: parseInt(formData.stock),
       images: selectedImages
-    });
+    };
+    
+    // Call the updateProduct function from our hook
+    const result = await updateProduct(productId, processedFormData);
     
     if (result) {
       // Product updated successfully, redirect happens in the hook

@@ -34,7 +34,9 @@ import {
   GraduationCap,
   FileCode,
   Gamepad,
-  Headphones
+  Headphones,
+  Clock,
+  Calendar
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -76,6 +78,22 @@ const cartoonStyle = {
   heading: "text-3xl font-extrabold tracking-wide",
   input: "bg-white border-3 border-black rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
 };
+
+// Product interface - matches the type from useProducts
+interface Product {
+  id: number;
+  name: string;
+  description: string;
+  price: number;
+  stock: number;
+  category: string;
+  status: string;
+  images: string[];
+  discountPercentage?: number | null;
+  discountedPrice?: number | null;
+  discountStartDate?: string | null;
+  discountEndDate?: string | null;
+}
 
 const SyncWithStripeButton = () => {
   const [isSyncing, setIsSyncing] = useState(false);
@@ -179,6 +197,51 @@ const SyncWithStripeButton = () => {
       )}
     </div>
   );
+};
+
+// Check if a discount is currently active
+const isDiscountActive = (product: Product) => {
+  if (!product?.discountPercentage) return false;
+  
+  const now = new Date();
+  const startDate = product.discountStartDate ? new Date(product.discountStartDate) : null;
+  const endDate = product.discountEndDate ? new Date(product.discountEndDate) : null;
+  
+  if (startDate && now < startDate) return false;
+  if (endDate && now > endDate) return false;
+  
+  return true;
+};
+
+// Get discount status label and style
+const getDiscountStatus = (product: Product) => {
+  if (!product?.discountPercentage) return null;
+  
+  const now = new Date();
+  const startDate = product.discountStartDate ? new Date(product.discountStartDate) : null;
+  const endDate = product.discountEndDate ? new Date(product.discountEndDate) : null;
+  
+  if (startDate && now < startDate) {
+    return {
+      label: 'Scheduled',
+      className: 'bg-blue-100 text-blue-800 border-blue-800',
+      icon: <Calendar className="h-3 w-3 mr-1" />
+    };
+  }
+  
+  if (endDate && now > endDate) {
+    return {
+      label: 'Expired',
+      className: 'bg-gray-100 text-gray-800 border-gray-800',
+      icon: <Clock className="h-3 w-3 mr-1" />
+    };
+  }
+  
+  return {
+    label: 'Active',
+    className: 'bg-green-100 text-green-800 border-green-800',
+    icon: null
+  };
 };
 
 export default function ProductsPage() {
@@ -479,7 +542,44 @@ export default function ProductsPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="py-4 px-4 font-bold text-black">RM {Number(product.price).toFixed(2)}</td>
+                        <td className="py-4 px-4">
+                          {product.discountPercentage ? (
+                            <div>
+                              {/* Always show original price */}
+                              <div className={isDiscountActive(product) ? "line-through text-gray-500" : "font-bold text-black"}>
+                                RM {Number(product.price).toFixed(2)}
+                              </div>
+                              
+                              {/* Only show discounted price if discount is active */}
+                              {isDiscountActive(product) && (
+                                <div className="font-bold text-red-600">
+                                  RM {Number(product.discountedPrice).toFixed(2)}
+                                  <span className="ml-2 px-2 py-0.5 bg-red-100 text-red-800 text-xs font-bold rounded-full border-2 border-red-800">
+                                    {product.discountPercentage}% OFF
+                                  </span>
+                                </div>
+                              )}
+                              
+                              {/* Add discount status indicator */}
+                              {getDiscountStatus(product) && (
+                                <div className="mt-1">
+                                  <span className={`inline-flex items-center px-2 py-0.5 text-xs font-bold rounded-full border-2 ${getDiscountStatus(product)?.className}`}>
+                                    {getDiscountStatus(product)?.icon}
+                                    {getDiscountStatus(product)?.label}
+                                  </span>
+                                  {product.discountStartDate && (
+                                    <span className="ml-1 text-xs text-gray-600">
+                                      {new Date(product.discountStartDate).toLocaleDateString()}
+                                      {product.discountEndDate && ` - ${new Date(product.discountEndDate).toLocaleDateString()}`}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="font-bold text-black">RM {Number(product.price).toFixed(2)}</span>
+                          )}
+                        </td>
                         <td className="py-4 px-4">
                           <span className={`font-bold ${product.stock === 0 ? 'text-red-600' : 'text-black'}`}>
                             {product.stock}

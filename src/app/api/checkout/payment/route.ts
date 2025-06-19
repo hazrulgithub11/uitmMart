@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import Stripe from 'stripe';
+import { Product } from '@prisma/client';
 
 // Initialize Stripe with secret key
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
@@ -15,6 +16,28 @@ const PLATFORM_FEE_PERCENTAGE = 0.05;
 // Max length for image URLs to prevent Stripe URL length errors
 const MAX_IMAGE_URL_LENGTH = 500;
 
+// Define extended product type to include discount fields
+type ExtendedProduct = Product & {
+  discountPercentage?: number | null;
+  discountStartDate?: Date | null;
+  discountEndDate?: Date | null;
+  discountedPrice?: number | null;
+};
+
+// Check if a discount is currently active
+const isDiscountActive = (product: ExtendedProduct) => {
+  if (!product.discountPercentage) return false;
+  
+  const now = new Date();
+  const startDate = product.discountStartDate ? new Date(product.discountStartDate) : null;
+  const endDate = product.discountEndDate ? new Date(product.discountEndDate) : null;
+  
+  if (startDate && now < startDate) return false;
+  if (endDate && now > endDate) return false;
+  
+  return true;
+};
+
 // Type definitions
 interface ShopItem {
   productId: number;
@@ -25,6 +48,8 @@ interface ShopItem {
     id: number;
     name: string;
     price: number;
+    discountedPrice?: number | null;
+    discountPercentage?: number | null;
     stock: number;
     images: string[];
     shopId: number;
@@ -127,7 +152,13 @@ export async function POST(req: Request) {
         );
       }
 
-      const unitPrice = parseFloat(product.price.toString());
+      // Check if discount is active before using discounted price
+      const extendedProduct = product as unknown as ExtendedProduct;
+      const hasActiveDiscount = extendedProduct.discountPercentage && isDiscountActive(extendedProduct);
+      const unitPrice = hasActiveDiscount && extendedProduct.discountedPrice
+        ? parseFloat(extendedProduct.discountedPrice.toString())
+        : parseFloat(product.price.toString());
+        
       const itemTotal = unitPrice * item.quantity;
       totalAmount += itemTotal;
 
@@ -155,7 +186,12 @@ export async function POST(req: Request) {
         throw new Error(`Product with ID ${item.productId} not found`);
       }
       
-      const unitPrice = parseFloat(product.price.toString());
+      // Check if discount is active before using discounted price
+      const extendedProduct = product as unknown as ExtendedProduct;
+      const hasActiveDiscount = extendedProduct.discountPercentage && isDiscountActive(extendedProduct);
+      const unitPrice = hasActiveDiscount && extendedProduct.discountedPrice
+        ? parseFloat(extendedProduct.discountedPrice.toString())
+        : parseFloat(product.price.toString());
       
       // Get product image and ensure it's not too long
       let productImages: string[] = [];
@@ -169,11 +205,17 @@ export async function POST(req: Request) {
         }
       }
       
+      // Add discount information to product name if applicable
+      let productName = product.name;
+      if (hasActiveDiscount && extendedProduct.discountPercentage) {
+        productName = `${product.name} (${extendedProduct.discountPercentage}% OFF)`;
+      }
+      
       return {
         price_data: {
           currency: 'myr',
           product_data: {
-            name: product.name,
+            name: productName,
             images: productImages,
             metadata: {
               productId: product.id.toString(),
@@ -340,4 +382,4 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
-} 
+}

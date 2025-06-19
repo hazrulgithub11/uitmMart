@@ -20,6 +20,21 @@ const cartoonStyle = {
   input: "bg-white border-3 border-black rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
 };
 
+// Check if a discount is currently active
+
+const isDiscountActive = (product: Product) => {
+  if (!product?.discountPercentage) return false;
+  
+  const now = new Date();
+  const startDate = product.discountStartDate ? new Date(product.discountStartDate) : null;
+  const endDate = product.discountEndDate ? new Date(product.discountEndDate) : null;
+  
+  if (startDate && now < startDate) return false;
+  if (endDate && now > endDate) return false;
+  
+  return true;
+};
+
 export default function MainPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -92,12 +107,13 @@ export default function MainPage() {
     setShowSuggestions(false);
   };
 
+  // Navigation items
   const navItems = [
     { name: 'Home', url: '/main', icon: Home },
     { name: 'Offers', url: '/offers', icon: Star },
     { name: 'Mall', url: '/mall', icon: Store },
     { name: 'Profile', url: '/profile', icon: User }
-  ]
+  ];
 
   // Split categories into two rows of 10 each
   const categoriesRow1 = [
@@ -186,8 +202,21 @@ export default function MainPage() {
                       <div className="text-sm font-bold text-black truncate">{product.name}</div>
                       <div className="text-xs text-gray-600">{product.category}</div>
                     </div>
-                    <div className="text-sm font-semibold text-black">
-                      RM {product.price.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    <div className="text-sm font-semibold">
+                      {product.discountPercentage && isDiscountActive(product) ? (
+                        <div className="flex flex-col items-end">
+                          <span className="text-gray-500 text-xs line-through">
+                            RM {product.price.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                          <span className="text-red-500">
+                            RM {Number(product.discountedPrice).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-black">
+                          RM {product.price.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -375,6 +404,12 @@ export default function MainPage() {
                       height={160}
                       className="w-full h-full object-cover"
                     />
+                    {/* Discount Badge - only show if discount is active */}
+                    {product.discountPercentage && isDiscountActive(product) && (
+                      <div className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full border-2 border-white">
+                        {product.discountPercentage}% OFF
+                      </div>
+                    )}
                   </div>
                   <div className="p-3">
                     <h3 className="text-sm text-black font-bold truncate">{product.name}</h3>
@@ -383,9 +418,20 @@ export default function MainPage() {
                         {product.category}
                       </div>
                     </div>
-                    <div className="mt-1 text-black font-semibold">
-                      RM {product.price.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </div>
+                    {product.discountPercentage && isDiscountActive(product) ? (
+                      <div className="mt-1">
+                        <span className="text-gray-500 text-xs line-through block">
+                          RM {product.price.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        <span className="text-red-500 font-semibold">
+                          RM {Number(product.discountedPrice).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="mt-1 text-black font-semibold">
+                        RM {product.price.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                    )}
                   </div>
                 </a>
               ))}
