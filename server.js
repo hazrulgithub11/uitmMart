@@ -33,6 +33,20 @@ const activeUsers = new Map();
 // Store recent messages
 const recentMessages = new Map();
 
+// Configure CORS for Express
+app.use(cors({
+  origin: [
+    'http://localhost:3000',
+    'https://uitmmart.site',
+    'http://uitmmart.site',
+    process.env.FRONTEND_URL,
+    process.env.NEXT_PUBLIC_BASE_URL,
+    process.env.NEXT_PUBLIC_APP_URL,
+  ].filter(Boolean),
+  methods: ['GET', 'POST'],
+  credentials: true,
+}));
+
 // Socket.io connection handler
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
@@ -222,8 +236,9 @@ io.on('connection', (socket) => {
   });
 });
 
-// Simple health check endpoint
+// Simple health check endpoint with improved logging
 app.get('/health', (req, res) => {
+  console.log(`[SERVER] Health check requested from ${req.ip}`);
   res.status(200).send('Socket.io server is running');
 });
 

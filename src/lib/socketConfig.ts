@@ -3,8 +3,10 @@ import { io, Socket } from 'socket.io-client';
 // Socket.io server URL - use environment variable or fallback to relative path
 // Using relative path allows it to work with the same domain in production
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://uitmmart.site';
-// Ensure no extra quotes in the URL
-const cleanSocketUrl = SOCKET_URL.replace(/['"]+/g, '');
+// Ensure no extra quotes in the URL and remove trailing slash if present
+const cleanSocketUrl = SOCKET_URL.replace(/['"]+/g, '').replace(/\/$/, '');
+
+console.log('[SOCKET CONFIG] Using socket URL:', cleanSocketUrl);
 
 // Socket.io connection options
 const socketOptions = {
@@ -24,30 +26,40 @@ let socket: Socket | null = null;
 export const initializeSocket = (): Socket => {
   if (!socket) {
     console.log('[SOCKET] Connecting to:', cleanSocketUrl);
-    socket = io(cleanSocketUrl, socketOptions);
-    
-    // Set up default listeners
-    socket.on('connect', () => {
-      console.log('[SOCKET] Connected:', socket?.id);
-    });
-    
-    socket.on('disconnect', (reason) => {
-      console.log('[SOCKET] Disconnected:', reason);
-    });
-    
-    socket.on('connect_error', (error) => {
-      console.error('[SOCKET] Connection error:', error);
-      // Try to reconnect after error
-      setTimeout(() => {
-        if (socket) {
-          console.log('[SOCKET] Attempting to reconnect...');
-          socket.connect();
-        }
-      }, 5000);
-    });
+    try {
+      socket = io(cleanSocketUrl, socketOptions);
+      
+      // Set up default listeners
+      socket.on('connect', () => {
+        console.log('[SOCKET] Connected:', socket?.id);
+      });
+      
+      socket.on('disconnect', (reason) => {
+        console.log('[SOCKET] Disconnected:', reason);
+      });
+      
+      socket.on('connect_error', (error) => {
+        console.error('[SOCKET] Connection error:', error);
+        console.error('[SOCKET] Connection error details:', {
+          url: cleanSocketUrl,
+          options: socketOptions,
+          errorMessage: error.message
+        });
+        
+        // Try to reconnect after error
+        setTimeout(() => {
+          if (socket) {
+            console.log('[SOCKET] Attempting to reconnect...');
+            socket.connect();
+          }
+        }, 5000);
+      });
+    } catch (error) {
+      console.error('[SOCKET] Failed to initialize socket:', error);
+    }
   }
   
-  return socket;
+  return socket as Socket;
 };
 
 // Get the socket instance
