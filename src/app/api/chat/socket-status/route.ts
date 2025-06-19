@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://c0a5-2001-d08-e1-3a1d-8ca7-cf78-91a-7435.ngrok-free.app';
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://uitmmart.site';
     const response = await fetch(`${socketUrl}/health`, {
       method: 'GET',
       headers: {

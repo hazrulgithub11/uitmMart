@@ -2,7 +2,7 @@ import { io, Socket } from 'socket.io-client';
 
 // Socket.io server URL - use environment variable or fallback to relative path
 // Using relative path allows it to work with the same domain in production
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || '/socket.io';
+const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || '';
 
 // Socket.io connection options
 const socketOptions = {
@@ -12,7 +12,7 @@ const socketOptions = {
   reconnectionDelay: 1000,
   timeout: 20000,
   transports: ['websocket', 'polling'], // Try WebSocket first, then fallback to polling
-  path: process.env.NEXT_PUBLIC_SOCKET_PATH || undefined,
+  path: '/socket.io',
 };
 
 // Create a socket instance

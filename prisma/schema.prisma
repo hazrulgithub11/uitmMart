@@ -244,6 +244,7 @@ model ChatMessage {
   read      Boolean  @default(false)
   chatId    Int
   senderId  Int
+  metadata Json?
   
   // Relations
   chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
