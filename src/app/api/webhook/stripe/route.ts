@@ -10,7 +10,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
 
 // Webhook endpoint to handle Stripe events
 export async function POST(req: Request) {
-  console.log('Webhook received');
+  console.log('Webhook received at /api/webhook/stripe');
   
   const body = await req.text();
   const signature = req.headers.get('stripe-signature') as string;
@@ -73,6 +73,10 @@ export async function POST(req: Request) {
         console.log('Processing payment_intent.payment_failed event');
         await handlePaymentIntentFailed(event.data.object as Stripe.PaymentIntent, stripeAccount);
         break;
+      case 'account.updated':
+        console.log('Processing account.updated event');
+        await handleAccountUpdated(event.data.object as Stripe.Account);
+        break;
       default:
         console.log(`Unhandled event type: ${event.type}`);
     }
@@ -87,6 +91,34 @@ export async function POST(req: Request) {
   }
 }
 
+// Handle account updates
+async function handleAccountUpdated(account: Stripe.Account) {
+  console.log(`Account ${account.id} updated`);
+  
+  try {
+    // Find the shop with this Stripe account ID
+    const shop = await prisma.shop.findFirst({
+      where: { 
+        stripeAccountId: account.id 
+      },
+      include: { seller: true },
+    });
+
+    if (shop) {
+      // Log the account update
+      console.log(`Found shop ${shop.name} for account ${account.id}`);
+      
+      // Here you could update shop status based on account capabilities
+      // For example, if certain capabilities are disabled, you might want to update the shop status
+    } else {
+      console.log(`No shop found for account ${account.id}`);
+    }
+  } catch (error) {
+    console.error('Error processing account.updated event:', error);
+    throw error;
+  }
+}
+
 // Handle successful checkout completion
 async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session, connectedAccountId?: string) {
   console.log('Handling checkout session completed', session.id);
@@ -95,9 +127,32 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session, 
   console.log('Session status:', session.status);
   console.log('Connected account ID:', connectedAccountId || 'None (platform event)');
   
+  // Check if we have orderIds in the metadata
   if (!session.metadata?.orderIds) {
-    console.error('No order IDs found in session metadata');
-    return;
+    // Try to find orders by session ID as a fallback
+    try {
+      const orders = await prisma.order.findMany({
+        where: {
+          stripeSessionId: session.id
+        },
+        select: {
+          id: true
+        }
+      });
+      
+      if (orders.length > 0) {
+        console.log(`Found ${orders.length} orders by session ID: ${session.id}`);
+        const orderIds = orders.map(order => order.id);
+        await updateOrdersToProcessing(orderIds, session.id, connectedAccountId);
+        return;
+      } else {
+        console.error('No orders found for session ID:', session.id);
+        return;
+      }
+    } catch (error) {
+      console.error('Error finding orders by session ID:', error);
+      return;
+    }
   }
 
   const orderIds = session.metadata.orderIds.split(',').map(id => parseInt(id));
@@ -106,18 +161,48 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session, 
   console.log('Order IDs to update:', orderIds);
   console.log('User ID from metadata:', userId);
   
+  await updateOrdersToProcessing(orderIds, session.id, connectedAccountId, userId);
+}
+
+// Common function to update orders to processing status
+async function updateOrdersToProcessing(orderIds: number[], sessionId: string, connectedAccountId?: string, userId?: number | null) {
   try {
+    // First check if any of these orders are already paid to avoid duplicate processing
+    const existingOrders = await prisma.order.findMany({
+      where: {
+        id: { in: orderIds },
+        paymentStatus: 'paid'
+      },
+      select: {
+        id: true
+      }
+    });
+    
+    if (existingOrders.length > 0) {
+      console.log(`Orders already processed: ${existingOrders.map(o => o.id).join(', ')}`);
+      // Filter out already processed orders
+      orderIds = orderIds.filter(id => !existingOrders.some(o => o.id === id));
+      
+      if (orderIds.length === 0) {
+        console.log('All orders already processed, nothing to update');
+        return;
+      }
+    }
+    
     // Update orders to paid status - check for connected account if present
-    const whereClause = connectedAccountId 
-      ? {
-          id: { in: orderIds },
-          stripeSessionId: session.id,
-          stripeAccountId: connectedAccountId
-        }
-      : {
-          id: { in: orderIds },
-          stripeSessionId: session.id
-        };
+    const whereClause: Record<string, unknown> = {
+      id: { in: orderIds }
+    };
+    
+    // Add session ID to where clause if available
+    if (sessionId) {
+      whereClause.stripeSessionId = sessionId;
+    }
+    
+    // Add account ID to where clause if available
+    if (connectedAccountId) {
+      whereClause.stripeAccountId = connectedAccountId;
+    }
     
     const updateResult = await prisma.order.updateMany({
       where: whereClause,
@@ -129,6 +214,30 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session, 
     });
     
     console.log('Orders update result:', updateResult);
+
+    if (updateResult.count === 0) {
+      // If no orders were updated with the strict criteria, try a more relaxed approach
+      // This is a fallback for cases where the stripeAccountId might not be set correctly
+      console.log('No orders updated with strict criteria, trying more relaxed criteria');
+      
+      const relaxedUpdateResult = await prisma.order.updateMany({
+        where: {
+          id: { in: orderIds }
+        },
+        data: {
+          status: 'processing',
+          paymentStatus: 'paid',
+          updatedAt: new Date()
+        }
+      });
+      
+      console.log('Relaxed orders update result:', relaxedUpdateResult);
+      
+      if (relaxedUpdateResult.count === 0) {
+        console.error('Failed to update any orders even with relaxed criteria');
+        return;
+      }
+    }
 
     // Get order items to update product stock
     const orderItems = await prisma.orderItem.findMany({
@@ -201,56 +310,17 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session, 
           }
         });
         
-        if (!order) {
-          console.error(`Order ${orderId} not found when trying to send email`);
-          continue;
+        if (order && order.buyer.email) {
+          await sendOrderConfirmationEmail({ order });
+          console.log(`Order confirmation email sent for order ${orderId}`);
         }
-        
-        // Get buyer information separately since it's not directly included in the order type
-        const buyer = await prisma.user.findUnique({
-          where: { id: order.buyerId }
-        });
-        
-        if (!buyer?.email) {
-          console.error(`No email found for buyer (ID: ${order.buyerId}) of order ${orderId}`);
-          continue;
-        }
-        
-        console.log(`Sending order confirmation email for order ${orderId} to ${buyer.email}`);
-        
-        // Try to send the email with retries
-        let attempts = 0;
-        const maxAttempts = 3;
-        
-        while (attempts < maxAttempts) {
-          try {
-            await sendOrderConfirmationEmail({ 
-              order: {
-                ...order,
-                buyer
-              } 
-            });
-            console.log(`Email sent successfully for order ${orderId}`);
-            break;
-          } catch (emailError) {
-            attempts++;
-            console.error(`Error sending email for order ${orderId} (attempt ${attempts}/${maxAttempts}):`, emailError);
-            
-            if (attempts >= maxAttempts) {
-              console.error(`Failed to send email after ${maxAttempts} attempts for order ${orderId}`);
-              // Could log to a separate error tracking system here
-            } else {
-              // Wait before retrying
-              await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
-            }
-          }
-        }
-      } catch (error) {
-        console.error(`Error processing email for order ${orderId}:`, error);
+      } catch (emailError) {
+        console.error(`Error sending order confirmation email for order ${orderId}:`, emailError);
+        // Don't throw the error as we don't want to fail the whole process
       }
     }
   } catch (error) {
-    console.error('Error updating orders and stock:', error);
+    console.error('Error updating orders to processing status:', error);
     throw error;
   }
 }
@@ -270,24 +340,44 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent,
   
   try {
     // Update orders with payment details - check for connected account if present
-    const whereClause = connectedAccountId 
-      ? {
-          id: { in: orderIds },
-          stripeAccountId: connectedAccountId
-        }
-      : {
-          id: { in: orderIds }
-        };
+    const whereClause: Record<string, unknown> = {
+      id: { in: orderIds }
+    };
+    
+    // Add account ID to where clause if available
+    if (connectedAccountId) {
+      whereClause.stripeAccountId = connectedAccountId;
+    }
     
     const updateResult = await prisma.order.updateMany({
       where: whereClause,
       data: {
         paymentStatus: 'paid',
+        status: 'processing', // Ensure status is also updated to processing
         updatedAt: new Date()
       }
     });
     
     console.log('Payment intent update result:', updateResult);
+    
+    if (updateResult.count === 0) {
+      // If no orders were updated with the strict criteria, try a more relaxed approach
+      console.log('No orders updated with strict criteria, trying more relaxed criteria');
+      
+      const relaxedUpdateResult = await prisma.order.updateMany({
+        where: {
+          id: { in: orderIds }
+        },
+        data: {
+          paymentStatus: 'paid',
+          status: 'processing',
+          updatedAt: new Date()
+        }
+      });
+      
+      console.log('Relaxed orders update result:', relaxedUpdateResult);
+    }
+    
     console.log(`Payment confirmed for orders ${orderIds.join(', ')}`);
   } catch (error) {
     console.error('Error updating orders after payment intent succeeded:', error);
