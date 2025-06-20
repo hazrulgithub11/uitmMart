@@ -184,6 +184,9 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session, 
         console.log(`Found ${orders.length} orders by session ID: ${session.id}`);
         const orderIds = orders.map(order => order.id);
         await updateOrdersToProcessing(orderIds, session.id, connectedAccountId);
+        
+        // Ensure emails are sent for these orders
+        await sendOrderConfirmationEmails(orderIds);
         return;
       } else {
         console.error('No orders found for session ID:', session.id);
@@ -201,7 +204,42 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session, 
   console.log('Order IDs to update:', orderIds);
   console.log('User ID from metadata:', userId);
   
-  await updateOrdersToProcessing(orderIds, session.id, connectedAccountId, userId);
+  // Check if any of these orders are already paid to avoid duplicate processing
+  const existingOrders = await prisma.order.findMany({
+    where: {
+      id: { in: orderIds },
+      paymentStatus: 'paid'
+    },
+    select: {
+      id: true
+    }
+  });
+  
+  if (existingOrders.length > 0) {
+    console.log(`Orders already processed: ${existingOrders.map(o => o.id).join(', ')}`);
+    // Even if orders are already processed, we should still send emails
+    
+    if (existingOrders.length === orderIds.length) {
+      console.log('All orders already processed, sending confirmation emails');
+      // Send emails for all orders even if they're already processed
+      await sendOrderConfirmationEmails(orderIds);
+    } else {
+      // Some orders need processing, some are already processed
+      const newOrderIds = orderIds.filter(id => !existingOrders.some(o => o.id === id));
+      console.log(`Processing ${newOrderIds.length} new orders, ${existingOrders.length} already processed`);
+      
+      // Process new orders
+      if (newOrderIds.length > 0) {
+        await updateOrdersToProcessing(newOrderIds, session.id, connectedAccountId, userId);
+      }
+      
+      // Send emails for all orders
+      await sendOrderConfirmationEmails(orderIds);
+    }
+  } else {
+    // No orders are already processed, proceed normally
+    await updateOrdersToProcessing(orderIds, session.id, connectedAccountId, userId);
+  }
   
   // Get order items to know which products were in the order
   let productIds: number[] = [];
@@ -226,6 +264,31 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session, 
   // Force clear the cart at the end of the function
   if (session.metadata?.userId && productIds.length > 0) {
     await forceCartClear(session.metadata.userId, productIds);
+  }
+}
+
+// Helper function to send confirmation emails for orders
+async function sendOrderConfirmationEmails(orderIds: number[]) {
+  // Send order confirmation email for each order
+  for (const orderId of orderIds) {
+    try {
+      // Get the order with all needed relationships
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+          items: true,
+          buyer: true
+        }
+      });
+      
+      if (order && order.buyer.email) {
+        await sendOrderConfirmationEmail({ order });
+        console.log(`Order confirmation email sent for order ${orderId}`);
+      }
+    } catch (emailError) {
+      console.error(`Error sending order confirmation email for order ${orderId}:`, emailError);
+      // Don't throw the error as we don't want to fail the whole process
+    }
   }
 }
 
@@ -337,27 +400,7 @@ async function updateOrdersToProcessing(orderIds: number[], sessionId: string, c
       await forceCartClear(userId, productIds);
     }
     
-    // Send order confirmation email for each order
-    for (const orderId of orderIds) {
-      try {
-        // Get the order with all needed relationships
-        const order = await prisma.order.findUnique({
-          where: { id: orderId },
-          include: {
-            items: true,
-            buyer: true
-          }
-        });
-        
-        if (order && order.buyer.email) {
-          await sendOrderConfirmationEmail({ order });
-          console.log(`Order confirmation email sent for order ${orderId}`);
-        }
-      } catch (emailError) {
-        console.error(`Error sending order confirmation email for order ${orderId}:`, emailError);
-        // Don't throw the error as we don't want to fail the whole process
-      }
-    }
+    // Note: Email sending is now handled by the sendOrderConfirmationEmails function
   } catch (error) {
     console.error('Error updating orders to processing status:', error);
     throw error;
@@ -419,6 +462,9 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent,
     }
     
     console.log(`Payment confirmed for orders ${orderIds.join(', ')}`);
+    
+    // Send confirmation emails
+    await sendOrderConfirmationEmails(orderIds);
     
     // Get product IDs from order items
     if (userId) {
