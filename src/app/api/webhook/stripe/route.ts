@@ -272,11 +272,15 @@ async function updateOrdersToProcessing(orderIds: number[], sessionId: string, c
         // Get product IDs from order items
         const productIds = orderItems.map(item => item.productId);
         
+        console.log(`Attempting to clear cart items for user ${userId} with product IDs:`, productIds);
+        
         // Find cart items for this user that match the purchased products
         const cartItems = await prisma.cartItem.findMany({
           where: {
             userId: userId,
-            productId: { in: productIds }
+            productId: { 
+              in: productIds.map(id => typeof id === 'string' ? parseInt(id) : id) 
+            }
           }
         });
         
@@ -291,6 +295,17 @@ async function updateOrdersToProcessing(orderIds: number[], sessionId: string, c
           });
           
           console.log(`Deleted ${deleteResult.count} cart items after successful checkout`);
+        } else {
+          // If no items found with the specific approach, try a more general approach
+          console.log('No cart items found with specific product IDs, trying direct user cart deletion');
+          
+          const deleteAllResult = await prisma.cartItem.deleteMany({
+            where: {
+              userId: userId
+            }
+          });
+          
+          console.log(`Deleted ${deleteAllResult.count} cart items using general approach`);
         }
       } catch (cartError) {
         console.error('Error clearing cart items after checkout:', cartError);
@@ -484,11 +499,15 @@ async function handleCheckoutSessionFailed(session: Stripe.Checkout.Session, con
         // Get product IDs from order items
         const productIds = orderItems.map(item => item.productId);
         
+        console.log(`Attempting to clear cart items for user ${userId} with product IDs:`, productIds);
+        
         // Find cart items for this user that match the ordered products
         const cartItems = await prisma.cartItem.findMany({
           where: {
             userId: userId,
-            productId: { in: productIds }
+            productId: { 
+              in: productIds.map(id => typeof id === 'string' ? parseInt(id) : id) 
+            }
           }
         });
         
@@ -503,6 +522,17 @@ async function handleCheckoutSessionFailed(session: Stripe.Checkout.Session, con
           });
           
           console.log(`Deleted ${deleteResult.count} cart items after ${reason} checkout`);
+        } else {
+          // If no items found with the specific approach, try a more general approach
+          console.log('No cart items found with specific product IDs, trying direct user cart deletion');
+          
+          const deleteAllResult = await prisma.cartItem.deleteMany({
+            where: {
+              userId: userId
+            }
+          });
+          
+          console.log(`Deleted ${deleteAllResult.count} cart items using general approach after ${reason} checkout`);
         }
       } catch (cartError) {
         console.error(`Error clearing cart items after ${reason} checkout:`, cartError);

@@ -98,17 +98,32 @@ function CheckoutSuccessContent() {
       
       // Find cart items that match the products in the order
       const cartItemsToDelete = cartItems.filter((cartItem: CartItem) => 
-        orderItems.some((orderItem: OrderItem) => 
+        orderItems.some((orderItem: OrderItem) => {
           // Convert both to string for comparison to handle type mismatches
-          String(orderItem.productId) === String(cartItem.productId)
-        )
+          const orderProductId = String(orderItem.productId);
+          const cartProductId = String(cartItem.productId);
+          console.log(`Comparing order product ID ${orderProductId} with cart product ID ${cartProductId}`);
+          return orderProductId === cartProductId;
+        })
       ).map((item: CartItem) => item.id);
       
       console.log('Found cart items to delete:', cartItemsToDelete.length);
       console.log('Cart item IDs to delete:', cartItemsToDelete);
       
       if (cartItemsToDelete.length === 0) {
-        console.log('No matching cart items found to delete');
+        console.log('No matching cart items found to delete, attempting to clear all cart items');
+        
+        // If no specific matches found, try to clear all cart items
+        const clearAllResponse = await fetch('/api/cart', {
+          method: 'DELETE'
+        });
+        
+        if (!clearAllResponse.ok) {
+          console.error('Failed to clear all cart items');
+        } else {
+          console.log('Successfully cleared all cart items');
+        }
+        
         return;
       }
       
@@ -127,6 +142,18 @@ function CheckoutSuccessContent() {
       if (!deleteResponse.ok) {
         const errorData = await deleteResponse.json();
         console.error('Failed to clear cart items after checkout:', errorData);
+        
+        // Fallback to clearing all cart items
+        console.log('Attempting fallback: clearing all cart items');
+        const clearAllResponse = await fetch('/api/cart', {
+          method: 'DELETE'
+        });
+        
+        if (!clearAllResponse.ok) {
+          console.error('Failed to clear all cart items in fallback');
+        } else {
+          console.log('Successfully cleared all cart items in fallback');
+        }
       } else {
         const result = await deleteResponse.json();
         console.log('Cart items cleared successfully after checkout:', result);

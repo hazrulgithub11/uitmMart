@@ -164,4 +164,34 @@ export async function POST(request: Request) {
     console.error('Error adding product to cart:', error);
     return NextResponse.json({ error: 'Failed to add product to cart' }, { status: 500 });
   }
+}
+
+// DELETE /api/cart - Clear all cart items for the current user
+export async function DELETE() {
+  try {
+    // Get the user session
+    const session = await getServerSession(authOptions);
+    
+    // Check if the user is authenticated
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    const userId = session.user.id;
+    
+    // Delete all cart items for this user
+    const deleteResult = await prisma.cartItem.deleteMany({
+      where: {
+        userId: userId,
+      }
+    });
+    
+    return NextResponse.json({ 
+      message: `Cleared ${deleteResult.count} items from cart`,
+      count: deleteResult.count
+    });
+  } catch (error) {
+    console.error('Error clearing cart items:', error);
+    return NextResponse.json({ error: 'Failed to clear cart items' }, { status: 500 });
+  }
 } 
