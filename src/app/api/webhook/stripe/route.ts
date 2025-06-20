@@ -9,29 +9,41 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
 });
 
 // Add a direct function to clear cart items for a user
-async function forceCartClear(userId: number | string | null) {
+async function forceCartClear(userId: number | string | null, productIds?: number[] | string[]) {
   if (!userId) {
     console.log('No user ID provided for cart clearing');
     return;
   }
   
   try {
-    console.log(`Force clearing all cart items for user ${userId}`);
-    
     // Convert userId to number if it's a string
     const userIdNum = typeof userId === 'string' ? parseInt(userId) : userId;
     
-    // Direct approach: delete all cart items for this user
-    const deleteResult = await prisma.cartItem.deleteMany({
-      where: {
-        userId: userIdNum
-      }
-    });
-    
-    console.log(`Force deleted ${deleteResult.count} cart items for user ${userId}`);
-    return deleteResult.count;
+    // If specific product IDs are provided, only delete those items
+    if (productIds && productIds.length > 0) {
+      console.log(`Selectively clearing cart items for user ${userId} with product IDs:`, productIds);
+      
+      // Convert all product IDs to numbers for consistency
+      const normalizedProductIds = productIds.map(id => 
+        typeof id === 'string' ? parseInt(id) : id
+      );
+      
+      // Delete only the specific cart items for this user
+      const deleteResult = await prisma.cartItem.deleteMany({
+        where: {
+          userId: userIdNum,
+          productId: { in: normalizedProductIds }
+        }
+      });
+      
+      console.log(`Selectively deleted ${deleteResult.count} cart items for user ${userId}`);
+      return deleteResult.count;
+    } else {
+      console.log('No specific product IDs provided, skipping cart clearing');
+      return 0;
+    }
   } catch (error) {
-    console.error('Error force clearing cart:', error);
+    console.error('Error selectively clearing cart:', error);
     return 0;
   }
 }
@@ -191,9 +203,29 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session, 
   
   await updateOrdersToProcessing(orderIds, session.id, connectedAccountId, userId);
   
+  // Get order items to know which products were in the order
+  let productIds: number[] = [];
+  if (session.metadata?.orderIds) {
+    try {
+      const orderItems = await prisma.orderItem.findMany({
+        where: {
+          orderId: { in: orderIds }
+        },
+        select: {
+          productId: true
+        }
+      });
+      
+      productIds = orderItems.map(item => item.productId);
+      console.log(`Found ${productIds.length} product IDs from order items for selective cart clearing`);
+    } catch (error) {
+      console.error('Error getting product IDs from order items:', error);
+    }
+  }
+  
   // Force clear the cart at the end of the function
-  if (userId) {
-    await forceCartClear(userId);
+  if (session.metadata?.userId && productIds.length > 0) {
+    await forceCartClear(session.metadata.userId, productIds);
   }
 }
 
@@ -301,7 +333,8 @@ async function updateOrdersToProcessing(orderIds: number[], sessionId: string, c
     
     // Force clear cart for this user if userId is provided
     if (userId) {
-      await forceCartClear(userId);
+      const productIds = orderItems.map(item => item.productId);
+      await forceCartClear(userId, productIds);
     }
     
     // Send order confirmation email for each order
@@ -387,9 +420,23 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent,
     
     console.log(`Payment confirmed for orders ${orderIds.join(', ')}`);
     
-    // Force clear cart for this user if userId is provided
+    // Get product IDs from order items
     if (userId) {
-      await forceCartClear(userId);
+      try {
+        const orderItems = await prisma.orderItem.findMany({
+          where: {
+            orderId: { in: orderIds }
+          },
+          select: {
+            productId: true
+          }
+        });
+        
+        const productIds = orderItems.map(item => item.productId);
+        await forceCartClear(userId, productIds);
+      } catch (error) {
+        console.error('Error getting product IDs for cart clearing:', error);
+      }
     }
   } catch (error) {
     console.error('Error updating orders after payment intent succeeded:', error);
@@ -434,9 +481,23 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent, co
     console.log('Failed payment update result:', updateResult);
     console.log(`Payment failed for orders ${orderIds.join(', ')}`);
     
-    // Force clear cart for this user if userId is provided
+    // Get product IDs from order items
     if (userId) {
-      await forceCartClear(userId);
+      try {
+        const orderItems = await prisma.orderItem.findMany({
+          where: {
+            orderId: { in: orderIds }
+          },
+          select: {
+            productId: true
+          }
+        });
+        
+        const productIds = orderItems.map(item => item.productId);
+        await forceCartClear(userId, productIds);
+      } catch (error) {
+        console.error('Error getting product IDs for cart clearing:', error);
+      }
     }
   } catch (error) {
     console.error('Error updating orders after payment intent failed:', error);
@@ -488,9 +549,20 @@ async function handleCheckoutSessionFailed(session: Stripe.Checkout.Session, con
     console.log('Orders update result:', updateResult);
     console.log(`Orders ${orderIds.join(', ')} marked as cancelled due to ${reason}`);
     
+    // Get order items to know which products were in the order
+    const orderItems = await prisma.orderItem.findMany({
+      where: {
+        orderId: { in: orderIds }
+      },
+      select: {
+        productId: true
+      }
+    });
+    
     // Force clear cart for this user if userId is provided
     if (userId) {
-      await forceCartClear(userId);
+      const productIds = orderItems.map(item => item.productId);
+      await forceCartClear(userId, productIds);
     }
   } catch (error) {
     console.error(`Error updating orders after checkout session ${reason}:`, error);

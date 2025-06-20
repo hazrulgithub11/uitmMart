@@ -15,23 +15,38 @@ export async function POST(request: Request) {
     }
     
     const userId = session.user.id;
-    const { orderId } = await request.json();
+    const { orderId, productIds } = await request.json();
     
-    console.log(`Clearing cart after checkout for user ${userId}, order ${orderId || 'unknown'}`);
-    
-    // Direct approach: delete all cart items for this user
-    const deleteResult = await prisma.cartItem.deleteMany({
-      where: {
-        userId: userId
-      }
-    });
-    
-    console.log(`Cleared ${deleteResult.count} items from cart after checkout`);
-    
-    return NextResponse.json({ 
-      message: `Cleared ${deleteResult.count} items from cart after checkout`,
-      count: deleteResult.count
-    });
+    // If product IDs are provided, only clear those specific items
+    if (productIds && Array.isArray(productIds) && productIds.length > 0) {
+      console.log(`Selectively clearing cart after checkout for user ${userId}, order ${orderId || 'unknown'}, products:`, productIds);
+      
+      // Convert all product IDs to numbers for consistency
+      const normalizedProductIds = productIds.map(id => 
+        typeof id === 'string' ? parseInt(id) : id
+      );
+      
+      // Delete only the specific cart items for this user
+      const deleteResult = await prisma.cartItem.deleteMany({
+        where: {
+          userId: userId,
+          productId: { in: normalizedProductIds }
+        }
+      });
+      
+      console.log(`Selectively cleared ${deleteResult.count} items from cart after checkout`);
+      
+      return NextResponse.json({ 
+        message: `Selectively cleared ${deleteResult.count} items from cart after checkout`,
+        count: deleteResult.count
+      });
+    } else {
+      console.log(`No product IDs provided for selective cart clearing for user ${userId}, order ${orderId || 'unknown'}`);
+      return NextResponse.json({ 
+        message: 'No product IDs provided for selective cart clearing',
+        count: 0
+      });
+    }
   } catch (error) {
     console.error('Error clearing cart after checkout:', error);
     return NextResponse.json({ error: 'Failed to clear cart after checkout' }, { status: 500 });

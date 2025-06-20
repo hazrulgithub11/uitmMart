@@ -74,11 +74,80 @@ function CheckoutSuccessContent() {
   
   const sessionId = searchParams.get('session_id');
   
-  // Immediate cart clearing on page load
-  useEffect(() => {
-    // Always try to clear the cart when this page loads
-    forceClearCart();
-  }, []);
+  // Force clear cart function as a fallback
+  const forceClearCart = async (specificProductIds?: string[] | number[]) => {
+    try {
+      // If we have specific product IDs, only clear those
+      if (specificProductIds && specificProductIds.length > 0) {
+        console.log('Selectively clearing specific products from cart:', specificProductIds);
+        
+        // Get current cart items
+        const cartResponse = await fetch('/api/cart');
+        if (cartResponse.ok) {
+          const cartData = await cartResponse.json();
+          const cartItems = cartData.cartItems || [];
+          
+          // Find cart items that match the products to clear
+          const cartItemsToDelete = cartItems.filter((cartItem: CartItem) => 
+            specificProductIds.some(productId => 
+              String(productId) === String(cartItem.productId)
+            )
+          ).map((item: CartItem) => item.id);
+          
+          if (cartItemsToDelete.length > 0) {
+            // Delete the specific items from cart using bulk delete endpoint
+            const deleteResponse = await fetch('/api/cart/bulk', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                action: 'delete',
+                itemIds: cartItemsToDelete,
+              }),
+            });
+            
+            if (deleteResponse.ok) {
+              const result = await deleteResponse.json();
+              console.log('Successfully cleared specific items from cart:', result);
+              return;
+            }
+          } else {
+            console.log('No matching cart items found for selective clearing');
+          }
+        }
+      }
+      
+      // Try the specialized endpoint as a fallback
+      try {
+        const specialResponse = await fetch('/api/cart/clear-after-checkout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            orderId: sessionId ? sessionId : 'unknown',
+            // Pass product IDs if available
+            productIds: specificProductIds || []
+          }),
+        });
+        
+        if (specialResponse.ok) {
+          const result = await specialResponse.json();
+          console.log('Successfully cleared cart via specialized endpoint:', result);
+          return;
+        }
+      } catch (specialError) {
+        console.error('Error with specialized cart clearing:', specialError);
+      }
+      
+      // Don't fall back to clearing the entire cart anymore
+      // We want to preserve items that weren't purchased
+      
+    } catch (err) {
+      console.error('Error in selective cart clearing:', err);
+    }
+  };
   
   // Clear items from cart after successful payment
   const clearCartItems = async (orderItems: OrderItem[]) => {
@@ -90,80 +159,13 @@ function CheckoutSuccessContent() {
       
       console.log('Attempting to clear cart items for order items:', orderItems.length);
       
-      // Get cart items that match the products in the order
-      const response = await fetch('/api/cart');
-      if (!response.ok) {
-        console.error('Failed to fetch cart items for cleanup');
-        return;
-      }
+      // Extract product IDs from order items
+      const productIds = orderItems.map(item => item.productId);
+      console.log('Product IDs to remove from cart:', productIds);
       
-      const cartData = await response.json();
-      const cartItems = cartData.cartItems || [];
+      // Use the force clear cart function with specific product IDs
+      await forceClearCart(productIds);
       
-      console.log('Total cart items found:', cartItems.length);
-      
-      // Find cart items that match the products in the order
-      const cartItemsToDelete = cartItems.filter((cartItem: CartItem) => 
-        orderItems.some((orderItem: OrderItem) => {
-          // Convert both to string for comparison to handle type mismatches
-          const orderProductId = String(orderItem.productId);
-          const cartProductId = String(cartItem.productId);
-          console.log(`Comparing order product ID ${orderProductId} with cart product ID ${cartProductId}`);
-          return orderProductId === cartProductId;
-        })
-      ).map((item: CartItem) => item.id);
-      
-      console.log('Found cart items to delete:', cartItemsToDelete.length);
-      console.log('Cart item IDs to delete:', cartItemsToDelete);
-      
-      if (cartItemsToDelete.length === 0) {
-        console.log('No matching cart items found to delete, attempting to clear all cart items');
-        
-        // If no specific matches found, try to clear all cart items
-        const clearAllResponse = await fetch('/api/cart', {
-          method: 'DELETE'
-        });
-        
-        if (!clearAllResponse.ok) {
-          console.error('Failed to clear all cart items');
-        } else {
-          console.log('Successfully cleared all cart items');
-        }
-        
-        return;
-      }
-      
-      // Delete the items from cart using bulk delete endpoint
-      const deleteResponse = await fetch('/api/cart/bulk', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'delete',
-          itemIds: cartItemsToDelete,
-        }),
-      });
-      
-      if (!deleteResponse.ok) {
-        const errorData = await deleteResponse.json();
-        console.error('Failed to clear cart items after checkout:', errorData);
-        
-        // Fallback to clearing all cart items
-        console.log('Attempting fallback: clearing all cart items');
-        const clearAllResponse = await fetch('/api/cart', {
-          method: 'DELETE'
-        });
-        
-        if (!clearAllResponse.ok) {
-          console.error('Failed to clear all cart items in fallback');
-        } else {
-          console.log('Successfully cleared all cart items in fallback');
-        }
-      } else {
-        const result = await deleteResponse.json();
-        console.log('Cart items cleared successfully after checkout:', result);
-      }
     } catch (err) {
       console.error('Error clearing cart after checkout:', err);
     }
@@ -180,9 +182,6 @@ function CheckoutSuccessContent() {
         console.error('Received template session ID that was not replaced by Stripe');
         setLoading(false);
         setError('Invalid session ID. Please check your order history for confirmation.');
-        
-        // Force clear cart as a fallback
-        forceClearCart();
         return;
       }
       
@@ -192,47 +191,6 @@ function CheckoutSuccessContent() {
       setError('No session ID found. Unable to verify your order.');
     }
   }, [sessionId]);
-  
-  // Force clear cart function as a fallback
-  const forceClearCart = async () => {
-    try {
-      console.log('Force clearing cart');
-      
-      // Try the specialized endpoint first
-      try {
-        const specialResponse = await fetch('/api/cart/clear-after-checkout', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            orderId: sessionId ? sessionId : 'unknown'
-          }),
-        });
-        
-        if (specialResponse.ok) {
-          const result = await specialResponse.json();
-          console.log('Successfully cleared cart via specialized endpoint:', result);
-          return;
-        }
-      } catch (specialError) {
-        console.error('Error with specialized cart clearing:', specialError);
-      }
-      
-      // Fall back to the regular DELETE endpoint
-      const response = await fetch('/api/cart', {
-        method: 'DELETE'
-      });
-      
-      if (response.ok) {
-        console.log('Successfully cleared cart via force mechanism');
-      } else {
-        console.error('Failed to clear cart via force mechanism');
-      }
-    } catch (err) {
-      console.error('Error in force clear cart:', err);
-    }
-  };
   
   const fetchOrderDetails = async (stripeSessionId: string) => {
     try {
@@ -259,7 +217,7 @@ function CheckoutSuccessContent() {
         });
         
         // Force clear cart as a fallback
-        await forceClearCart();
+        await forceClearCart([]);
       }
       
       setLoading(false);
@@ -272,7 +230,7 @@ function CheckoutSuccessContent() {
       });
       
       // Force clear cart as a fallback
-      await forceClearCart();
+      await forceClearCart([]);
       
       setLoading(false);
     }
