@@ -74,6 +74,12 @@ function CheckoutSuccessContent() {
   
   const sessionId = searchParams.get('session_id');
   
+  // Immediate cart clearing on page load
+  useEffect(() => {
+    // Always try to clear the cart when this page loads
+    forceClearCart();
+  }, []);
+  
   // Clear items from cart after successful payment
   const clearCartItems = async (orderItems: OrderItem[]) => {
     try {
@@ -169,12 +175,64 @@ function CheckoutSuccessContent() {
     
     // If we have a session ID, fetch order details
     if (sessionId) {
+      // Check if the session ID is the template literal that wasn't replaced
+      if (sessionId === '{CHECKOUT_SESSION_ID}' || sessionId.includes('{CHECKOUT_SESSION_ID}')) {
+        console.error('Received template session ID that was not replaced by Stripe');
+        setLoading(false);
+        setError('Invalid session ID. Please check your order history for confirmation.');
+        
+        // Force clear cart as a fallback
+        forceClearCart();
+        return;
+      }
+      
       fetchOrderDetails(sessionId);
     } else {
       setLoading(false);
       setError('No session ID found. Unable to verify your order.');
     }
   }, [sessionId]);
+  
+  // Force clear cart function as a fallback
+  const forceClearCart = async () => {
+    try {
+      console.log('Force clearing cart');
+      
+      // Try the specialized endpoint first
+      try {
+        const specialResponse = await fetch('/api/cart/clear-after-checkout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            orderId: sessionId ? sessionId : 'unknown'
+          }),
+        });
+        
+        if (specialResponse.ok) {
+          const result = await specialResponse.json();
+          console.log('Successfully cleared cart via specialized endpoint:', result);
+          return;
+        }
+      } catch (specialError) {
+        console.error('Error with specialized cart clearing:', specialError);
+      }
+      
+      // Fall back to the regular DELETE endpoint
+      const response = await fetch('/api/cart', {
+        method: 'DELETE'
+      });
+      
+      if (response.ok) {
+        console.log('Successfully cleared cart via force mechanism');
+      } else {
+        console.error('Failed to clear cart via force mechanism');
+      }
+    } catch (err) {
+      console.error('Error in force clear cart:', err);
+    }
+  };
   
   const fetchOrderDetails = async (stripeSessionId: string) => {
     try {
@@ -199,6 +257,9 @@ function CheckoutSuccessContent() {
           orderNumber: `UITM-${Date.now().toString().slice(-6)}`,
           date: new Date().toLocaleDateString()
         });
+        
+        // Force clear cart as a fallback
+        await forceClearCart();
       }
       
       setLoading(false);
@@ -209,6 +270,10 @@ function CheckoutSuccessContent() {
         orderNumber: `UITM-${Date.now().toString().slice(-6)}`,
         date: new Date().toLocaleDateString()
       });
+      
+      // Force clear cart as a fallback
+      await forceClearCart();
+      
       setLoading(false);
     }
   };

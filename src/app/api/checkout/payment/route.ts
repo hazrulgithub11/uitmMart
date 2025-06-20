@@ -307,19 +307,19 @@ export async function POST(req: Request) {
     );
     
     // Create a valid success URL with proper URL encoding
-    const successUrl = new URL('/checkout/success', baseUrl);
-    successUrl.searchParams.append('session_id', '{CHECKOUT_SESSION_ID}');
+    // Don't use URL object to avoid encoding the Stripe template variable
+    const successUrl = `${baseUrl.toString().replace(/\/$/, '')}/checkout/success?session_id={CHECKOUT_SESSION_ID}`;
     
     // Create a valid cancel URL with proper URL encoding
-    const cancelUrl = new URL('/checkout/cancel', baseUrl);
+    const cancelUrl = `${baseUrl.toString().replace(/\/$/, '')}/checkout/cancel`;
 
     // Create Stripe checkout session options
     const sessionOptions: Stripe.Checkout.SessionCreateParams = {
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'payment',
-      success_url: successUrl.toString(),
-      cancel_url: cancelUrl.toString(),
+      success_url: successUrl,
+      cancel_url: cancelUrl,
       customer_email: session.user.email || undefined,
       metadata: {
         orderIds: orders.map(order => order.id.toString()).join(','),

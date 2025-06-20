@@ -8,6 +8,34 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2025-04-30.basil',
 });
 
+// Add a direct function to clear cart items for a user
+async function forceCartClear(userId: number | string | null) {
+  if (!userId) {
+    console.log('No user ID provided for cart clearing');
+    return;
+  }
+  
+  try {
+    console.log(`Force clearing all cart items for user ${userId}`);
+    
+    // Convert userId to number if it's a string
+    const userIdNum = typeof userId === 'string' ? parseInt(userId) : userId;
+    
+    // Direct approach: delete all cart items for this user
+    const deleteResult = await prisma.cartItem.deleteMany({
+      where: {
+        userId: userIdNum
+      }
+    });
+    
+    console.log(`Force deleted ${deleteResult.count} cart items for user ${userId}`);
+    return deleteResult.count;
+  } catch (error) {
+    console.error('Error force clearing cart:', error);
+    return 0;
+  }
+}
+
 // Webhook endpoint to handle Stripe events
 export async function POST(req: Request) {
   console.log('Webhook received at /api/webhook/stripe');
@@ -162,6 +190,11 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session, 
   console.log('User ID from metadata:', userId);
   
   await updateOrdersToProcessing(orderIds, session.id, connectedAccountId, userId);
+  
+  // Force clear the cart at the end of the function
+  if (userId) {
+    await forceCartClear(userId);
+  }
 }
 
 // Common function to update orders to processing status
@@ -266,51 +299,9 @@ async function updateOrdersToProcessing(orderIds: number[], sessionId: string, c
 
     console.log(`Orders ${orderIds.join(', ')} marked as paid and stock updated`);
     
-    // Clear cart items for this user
+    // Force clear cart for this user if userId is provided
     if (userId) {
-      try {
-        // Get product IDs from order items
-        const productIds = orderItems.map(item => item.productId);
-        
-        console.log(`Attempting to clear cart items for user ${userId} with product IDs:`, productIds);
-        
-        // Find cart items for this user that match the purchased products
-        const cartItems = await prisma.cartItem.findMany({
-          where: {
-            userId: userId,
-            productId: { 
-              in: productIds.map(id => typeof id === 'string' ? parseInt(id) : id) 
-            }
-          }
-        });
-        
-        console.log(`Found ${cartItems.length} cart items to delete for user ${userId}`);
-        
-        if (cartItems.length > 0) {
-          // Delete the cart items
-          const deleteResult = await prisma.cartItem.deleteMany({
-            where: {
-              id: { in: cartItems.map(item => item.id) }
-            }
-          });
-          
-          console.log(`Deleted ${deleteResult.count} cart items after successful checkout`);
-        } else {
-          // If no items found with the specific approach, try a more general approach
-          console.log('No cart items found with specific product IDs, trying direct user cart deletion');
-          
-          const deleteAllResult = await prisma.cartItem.deleteMany({
-            where: {
-              userId: userId
-            }
-          });
-          
-          console.log(`Deleted ${deleteAllResult.count} cart items using general approach`);
-        }
-      } catch (cartError) {
-        console.error('Error clearing cart items after checkout:', cartError);
-        // Don't throw the error as we don't want to fail the whole process
-      }
+      await forceCartClear(userId);
     }
     
     // Send order confirmation email for each order
@@ -352,6 +343,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent,
   }
 
   const orderIds = paymentIntent.metadata.orderIds.split(',').map(id => parseInt(id));
+  const userId = paymentIntent.metadata.userId ? parseInt(paymentIntent.metadata.userId) : null;
   
   try {
     // Update orders with payment details - check for connected account if present
@@ -394,6 +386,11 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent,
     }
     
     console.log(`Payment confirmed for orders ${orderIds.join(', ')}`);
+    
+    // Force clear cart for this user if userId is provided
+    if (userId) {
+      await forceCartClear(userId);
+    }
   } catch (error) {
     console.error('Error updating orders after payment intent succeeded:', error);
     throw error;
@@ -412,6 +409,7 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent, co
   }
 
   const orderIds = paymentIntent.metadata.orderIds.split(',').map(id => parseInt(id));
+  const userId = paymentIntent.metadata.userId ? parseInt(paymentIntent.metadata.userId) : null;
   
   try {
     // Update orders with failed payment status - check for connected account if present
@@ -435,6 +433,11 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent, co
     
     console.log('Failed payment update result:', updateResult);
     console.log(`Payment failed for orders ${orderIds.join(', ')}`);
+    
+    // Force clear cart for this user if userId is provided
+    if (userId) {
+      await forceCartClear(userId);
+    }
   } catch (error) {
     console.error('Error updating orders after payment intent failed:', error);
     throw error;
@@ -485,62 +488,12 @@ async function handleCheckoutSessionFailed(session: Stripe.Checkout.Session, con
     console.log('Orders update result:', updateResult);
     console.log(`Orders ${orderIds.join(', ')} marked as cancelled due to ${reason}`);
     
-    // Get order items to know which products were in the order
-    const orderItems = await prisma.orderItem.findMany({
-      where: {
-        orderId: { in: orderIds }
-      }
-    });
-    
-    // Clear cart items for this user
-    // We still delete cart items even on payment failure so user can retry with a fresh cart
+    // Force clear cart for this user if userId is provided
     if (userId) {
-      try {
-        // Get product IDs from order items
-        const productIds = orderItems.map(item => item.productId);
-        
-        console.log(`Attempting to clear cart items for user ${userId} with product IDs:`, productIds);
-        
-        // Find cart items for this user that match the ordered products
-        const cartItems = await prisma.cartItem.findMany({
-          where: {
-            userId: userId,
-            productId: { 
-              in: productIds.map(id => typeof id === 'string' ? parseInt(id) : id) 
-            }
-          }
-        });
-        
-        console.log(`Found ${cartItems.length} cart items to delete for user ${userId}`);
-        
-        if (cartItems.length > 0) {
-          // Delete the cart items
-          const deleteResult = await prisma.cartItem.deleteMany({
-            where: {
-              id: { in: cartItems.map(item => item.id) }
-            }
-          });
-          
-          console.log(`Deleted ${deleteResult.count} cart items after ${reason} checkout`);
-        } else {
-          // If no items found with the specific approach, try a more general approach
-          console.log('No cart items found with specific product IDs, trying direct user cart deletion');
-          
-          const deleteAllResult = await prisma.cartItem.deleteMany({
-            where: {
-              userId: userId
-            }
-          });
-          
-          console.log(`Deleted ${deleteAllResult.count} cart items using general approach after ${reason} checkout`);
-        }
-      } catch (cartError) {
-        console.error(`Error clearing cart items after ${reason} checkout:`, cartError);
-        // Don't throw the error as we don't want to fail the whole process
-      }
+      await forceCartClear(userId);
     }
   } catch (error) {
     console.error(`Error updating orders after checkout session ${reason}:`, error);
     throw error;
   }
-} 
+}
