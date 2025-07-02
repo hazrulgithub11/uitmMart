@@ -232,6 +232,9 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session, 
 // Common function to update orders to processing status
 async function updateOrdersToProcessing(orderIds: number[], sessionId: string, connectedAccountId?: string, userId?: number | null) {
   try {
+    // Store original order IDs for email sending
+    const originalOrderIds = [...orderIds];
+    
     // First check if any of these orders are already paid to avoid duplicate processing
     const existingOrders = await prisma.order.findMany({
       where: {
@@ -245,50 +248,34 @@ async function updateOrdersToProcessing(orderIds: number[], sessionId: string, c
     
     if (existingOrders.length > 0) {
       console.log(`Orders already processed: ${existingOrders.map(o => o.id).join(', ')}`);
-      // Filter out already processed orders
+      // Filter out already processed orders for status updates
       orderIds = orderIds.filter(id => !existingOrders.some(o => o.id === id));
       
       if (orderIds.length === 0) {
-        console.log('All orders already processed, nothing to update');
-        return;
+        console.log('All orders already processed, but will still send emails if needed');
+        // Don't return here - we still need to send emails for already processed orders
       }
     }
     
-    // Update orders to paid status - check for connected account if present
-    const whereClause: Record<string, unknown> = {
-      id: { in: orderIds }
-    };
-    
-    // Add session ID to where clause if available
-    if (sessionId) {
-      whereClause.stripeSessionId = sessionId;
-    }
-    
-    // Add account ID to where clause if available
-    if (connectedAccountId) {
-      whereClause.stripeAccountId = connectedAccountId;
-    }
-    
-    const updateResult = await prisma.order.updateMany({
-      where: whereClause,
-      data: {
-        status: 'processing',
-        paymentStatus: 'paid',
-        updatedAt: new Date()
-      }
-    });
-    
-    console.log('Orders update result:', updateResult);
-
-    if (updateResult.count === 0) {
-      // If no orders were updated with the strict criteria, try a more relaxed approach
-      // This is a fallback for cases where the stripeAccountId might not be set correctly
-      console.log('No orders updated with strict criteria, trying more relaxed criteria');
+    // Only update orders that haven't been processed yet
+    if (orderIds.length > 0) {
+      // Update orders to paid status - check for connected account if present
+      const whereClause: Record<string, unknown> = {
+        id: { in: orderIds }
+      };
       
-      const relaxedUpdateResult = await prisma.order.updateMany({
-        where: {
-          id: { in: orderIds }
-        },
+      // Add session ID to where clause if available
+      if (sessionId) {
+        whereClause.stripeSessionId = sessionId;
+      }
+      
+      // Add account ID to where clause if available
+      if (connectedAccountId) {
+        whereClause.stripeAccountId = connectedAccountId;
+      }
+      
+      const updateResult = await prisma.order.updateMany({
+        where: whereClause,
         data: {
           status: 'processing',
           paymentStatus: 'paid',
@@ -296,49 +283,85 @@ async function updateOrdersToProcessing(orderIds: number[], sessionId: string, c
         }
       });
       
-      console.log('Relaxed orders update result:', relaxedUpdateResult);
-      
-      if (relaxedUpdateResult.count === 0) {
-        console.error('Failed to update any orders even with relaxed criteria');
-        return;
-      }
-    }
+      console.log('Orders update result:', updateResult);
 
-    // Get order items to update product stock
-    const orderItems = await prisma.orderItem.findMany({
-      where: {
-        orderId: { in: orderIds }
-      },
-      include: {
-        product: true
+      if (updateResult.count === 0) {
+        // If no orders were updated with the strict criteria, try a more relaxed approach
+        // This is a fallback for cases where the stripeAccountId might not be set correctly
+        console.log('No orders updated with strict criteria, trying more relaxed criteria');
+        
+        const relaxedUpdateResult = await prisma.order.updateMany({
+          where: {
+            id: { in: orderIds }
+          },
+          data: {
+            status: 'processing',
+            paymentStatus: 'paid',
+            updatedAt: new Date()
+          }
+        });
+        
+        console.log('Relaxed orders update result:', relaxedUpdateResult);
+        
+        if (relaxedUpdateResult.count === 0) {
+          console.error('Failed to update any orders even with relaxed criteria');
+          return;
+        }
       }
-    });
-    
-    console.log(`Found ${orderItems.length} order items to update stock`);
 
-    // Update product stock for each item
-    for (const item of orderItems) {
-      const stockUpdate = await prisma.product.update({
+      // Get order items to update product stock
+      const orderItems = await prisma.orderItem.findMany({
         where: {
-          id: item.productId
+          orderId: { in: orderIds }
         },
-        data: {
-          stock: Math.max(0, item.product.stock - item.quantity)
+        include: {
+          product: true
         }
       });
-      console.log(`Updated stock for product ${item.productId}: ${stockUpdate.stock}`);
-    }
+      
+      console.log(`Found ${orderItems.length} order items to update stock`);
 
-    console.log(`Orders ${orderIds.join(', ')} marked as paid and stock updated`);
-    
-    // Force clear cart for this user if userId is provided
-    if (userId) {
-      const productIds = orderItems.map(item => item.productId);
-      await forceCartClear(userId, productIds);
+      // Update product stock for each item
+      for (const item of orderItems) {
+        const stockUpdate = await prisma.product.update({
+          where: {
+            id: item.productId
+          },
+          data: {
+            stock: Math.max(0, item.product.stock - item.quantity)
+          }
+        });
+        console.log(`Updated stock for product ${item.productId}: ${stockUpdate.stock}`);
+      }
+
+      console.log(`Orders ${orderIds.join(', ')} marked as paid and stock updated`);
+      
+      // Force clear cart for this user if userId is provided
+      if (userId) {
+        const productIds = orderItems.map(item => item.productId);
+        await forceCartClear(userId, productIds);
+      }
+    } else {
+      console.log('No orders need status updates, but handling cart clearing for user');
+      
+      // Even if no orders need updates, we still need to handle cart clearing
+      if (userId) {
+        const orderItems = await prisma.orderItem.findMany({
+          where: {
+            orderId: { in: originalOrderIds }
+          },
+          select: {
+            productId: true
+          }
+        });
+        
+        const productIds = orderItems.map(item => item.productId);
+        await forceCartClear(userId, productIds);
+      }
     }
     
-    // Send order confirmation email for each order
-    for (const orderId of orderIds) {
+    // Send order confirmation email for each order (use original order IDs)
+    for (const orderId of originalOrderIds) {
       try {
         // Get the order with all needed relationships
         const order = await prisma.order.findUnique({
