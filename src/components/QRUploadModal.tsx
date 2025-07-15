@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CheckCircle, AlertCircle, Loader2, QrCode, Clock, Smartphone } from 'lucide-react';
@@ -42,19 +42,26 @@ export default function QRUploadModal({ isOpen, onClose, onSuccess, type }: QRUp
   const [status, setStatus] = useState<'generating' | 'ready' | 'waiting' | 'uploaded' | 'expired' | 'error'>('generating');
   const [message, setMessage] = useState<string>('');
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
-  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
+  
+  // Use refs to store interval IDs to avoid circular dependencies
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Clean up on unmount or close
   const cleanup = useCallback(() => {
-    if (pollingInterval) {
-      clearInterval(pollingInterval);
-      setPollingInterval(null);
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
     }
     setSessionData(null);
     setStatus('generating');
     setMessage('');
     setTimeRemaining(0);
-  }, [pollingInterval]);
+  }, []);
 
   const generateQRCode = useCallback(async () => {
     try {
@@ -92,11 +99,9 @@ export default function QRUploadModal({ isOpen, onClose, onSuccess, type }: QRUp
     }
   }, [type]);
 
-  const checkSessionStatus = useCallback(async () => {
-    if (!sessionData) return;
-
+  const checkSessionStatus = useCallback(async (currentSessionData: SessionData) => {
     try {
-      const response = await fetch(`/api/qr-upload/generate-session?sessionId=${sessionData.sessionId}`);
+      const response = await fetch(`/api/qr-upload/generate-session?sessionId=${currentSessionData.sessionId}`);
       
       if (!response.ok) {
         throw new Error('Failed to check session status');
@@ -109,9 +114,13 @@ export default function QRUploadModal({ isOpen, onClose, onSuccess, type }: QRUp
         setMessage('Image uploaded successfully!');
         
         // Clear polling
-        if (pollingInterval) {
-          clearInterval(pollingInterval);
-          setPollingInterval(null);
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+        if (timerIntervalRef.current) {
+          clearInterval(timerIntervalRef.current);
+          timerIntervalRef.current = null;
         }
 
         // Notify parent component
@@ -123,42 +132,20 @@ export default function QRUploadModal({ isOpen, onClose, onSuccess, type }: QRUp
         setStatus('expired');
         setMessage('Session has expired. Please try again.');
         
-        if (pollingInterval) {
-          clearInterval(pollingInterval);
-          setPollingInterval(null);
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+        if (timerIntervalRef.current) {
+          clearInterval(timerIntervalRef.current);
+          timerIntervalRef.current = null;
         }
       }
     } catch (error) {
       console.error('Error checking session status:', error);
       // Don't show error for polling failures to avoid spam
     }
-  }, [sessionData, pollingInterval, onSuccess, onClose]);
-
-  const startPolling = useCallback(() => {
-    if (pollingInterval) {
-      clearInterval(pollingInterval);
-    }
-
-    const interval = setInterval(async () => {
-      await checkSessionStatus();
-    }, 2000); // Poll every 2 seconds
-
-    setPollingInterval(interval);
-  }, [pollingInterval, checkSessionStatus]);
-
-  const startTimer = useCallback(() => {
-    const timer = setInterval(() => {
-      setTimeRemaining(prev => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setStatus('expired');
-          setMessage('QR code has expired. Please try again.');
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  }, []);
+  }, [onSuccess, onClose]);
 
   // Generate QR code when modal opens
   useEffect(() => {
@@ -167,19 +154,51 @@ export default function QRUploadModal({ isOpen, onClose, onSuccess, type }: QRUp
     }
   }, [isOpen, sessionData, generateQRCode]);
 
-  // Start polling when session is ready
+  // Start polling and timer when session is ready
   useEffect(() => {
     if (status === 'ready' && sessionData) {
-      startPolling();
-      startTimer();
+      // Start polling
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+      
+      pollingIntervalRef.current = setInterval(() => {
+        checkSessionStatus(sessionData);
+      }, 2000); // Poll every 2 seconds
+
+      // Start timer
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+      
+      timerIntervalRef.current = setInterval(() => {
+        setTimeRemaining(prev => {
+          if (prev <= 1) {
+            if (timerIntervalRef.current) {
+              clearInterval(timerIntervalRef.current);
+              timerIntervalRef.current = null;
+            }
+            setStatus('expired');
+            setMessage('QR code has expired. Please try again.');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     }
 
+    // Cleanup function
     return () => {
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
       }
     };
-  }, [status, sessionData, startPolling, startTimer, pollingInterval]);
+  }, [status, sessionData, checkSessionStatus]);
 
   // Clean up on unmount or close
   useEffect(() => {
