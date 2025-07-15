@@ -129,7 +129,7 @@ interface ShippingDetailsModalProps {
 
 // Cartoon UI Style
 const cartoonStyle = {
-  card: "bg-white border-4 border-black rounded-2xl shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] p-6 transition-all hover:shadow-[12px_12px_0px_0px_rgba(0,0,0,0.8)]", 
+  card: "bg-white border-4 border-black rounded-2xl shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] p-6 transition-all hover:shadow-[12px_12px_0px_0px_rgba(0,0,0,0.8)]",
   button: "bg-white border-3 border-black rounded-lg shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,0.8)] transition-all active:translate-y-1 active:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]",
   buttonSuccess: "bg-emerald-500 text-white border-3 border-black rounded-lg shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,0.8)] transition-all active:translate-y-1 active:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]",
   buttonPrimary: "bg-blue-500 text-white border-3 border-black rounded-lg shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,0.8)] transition-all active:translate-y-1 active:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]",
@@ -224,7 +224,7 @@ const ShippingDetailsModal: React.FC<ShippingDetailsModalProps> = ({ isOpen, onC
   };
 
   // Register tracking number with tracking.my API
-  const registerTrackingNumber = async (trackingNum: string, courierCd: string) => {
+  const registerTrackingNumber = useCallback(async (trackingNum: string, courierCd: string) => {
     if (!trackingNum || !courierCd) {
       console.error('Tracking number and courier code are required to register tracking');
       return false;
@@ -266,7 +266,7 @@ const ShippingDetailsModal: React.FC<ShippingDetailsModalProps> = ({ isOpen, onC
       console.error('Error registering tracking number:', error);
       return false;
     }
-  };
+  }, [order?.id]);
 
   // Fetch tracking details function
   const fetchTrackingDetails = useCallback(async (trackingNum = trackingNumber, courierCd = courierCode) => {
@@ -404,7 +404,7 @@ const ShippingDetailsModal: React.FC<ShippingDetailsModalProps> = ({ isOpen, onC
     } finally {
       setIsLoadingTrackingDetails(false);
     }
-  }, [trackingNumber, courierCode, order, orderStatus]);
+  }, [trackingNumber, courierCode, order, orderStatus, registerTrackingNumber]);
 
   // Fetch initial tracking data when modal is opened with existing tracking information
   useEffect(() => {

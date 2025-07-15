@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { CheckCircle, ArrowRight, ShoppingBag, Home,  User, Mail, Star, Store } from 'lucide-react';
 import Link from 'next/link';
@@ -75,7 +75,7 @@ function CheckoutSuccessContent() {
   const sessionId = searchParams.get('session_id');
   
   // Force clear cart function as a fallback
-  const forceClearCart = async (specificProductIds?: string[] | number[]) => {
+  const forceClearCart = useCallback(async (specificProductIds?: string[] | number[]) => {
     try {
       // If we have specific product IDs, only clear those
       if (specificProductIds && specificProductIds.length > 0) {
@@ -147,10 +147,10 @@ function CheckoutSuccessContent() {
     } catch (err) {
       console.error('Error in selective cart clearing:', err);
     }
-  };
+  }, [sessionId]);
   
   // Clear items from cart after successful payment
-  const clearCartItems = async (orderItems: OrderItem[]) => {
+  const clearCartItems = useCallback(async (orderItems: OrderItem[]) => {
     try {
       if (!orderItems || orderItems.length === 0) {
         console.log('No order items to clear from cart');
@@ -169,30 +169,9 @@ function CheckoutSuccessContent() {
     } catch (err) {
       console.error('Error clearing cart after checkout:', err);
     }
-  };
+  }, [forceClearCart]);
   
-  useEffect(() => {
-    // Clear checkout items from session storage
-    sessionStorage.removeItem('checkoutItems');
-    
-    // If we have a session ID, fetch order details
-    if (sessionId) {
-      // Check if the session ID is the template literal that wasn't replaced
-      if (sessionId === '{CHECKOUT_SESSION_ID}' || sessionId.includes('{CHECKOUT_SESSION_ID}')) {
-        console.error('Received template session ID that was not replaced by Stripe');
-        setLoading(false);
-        setError('Invalid session ID. Please check your order history for confirmation.');
-        return;
-      }
-      
-      fetchOrderDetails(sessionId);
-    } else {
-      setLoading(false);
-      setError('No session ID found. Unable to verify your order.');
-    }
-  }, [sessionId]);
-  
-  const fetchOrderDetails = async (stripeSessionId: string) => {
+  const fetchOrderDetails = useCallback(async (stripeSessionId: string) => {
     try {
       const response = await fetch(`/api/orders/session?sessionId=${stripeSessionId}`);
       
@@ -219,22 +198,34 @@ function CheckoutSuccessContent() {
         // Force clear cart as a fallback
         await forceClearCart([]);
       }
-      
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching order details:', error);
-      // Fallback to simulated data if error
-      setOrderDetails({
-        orderNumber: `UITM-${Date.now().toString().slice(-6)}`,
-        date: new Date().toLocaleDateString()
-      });
-      
-      // Force clear cart as a fallback
-      await forceClearCart([]);
-      
+    } catch (err) {
+      console.error('Error fetching order details:', err);
+      setError('Failed to load order details. Please check your order history.');
+    } finally {
       setLoading(false);
     }
-  };
+  }, [clearCartItems, forceClearCart]);
+
+  useEffect(() => {
+    // Clear checkout items from session storage
+    sessionStorage.removeItem('checkoutItems');
+    
+    // If we have a session ID, fetch order details
+    if (sessionId) {
+      // Check if the session ID is the template literal that wasn't replaced
+      if (sessionId === '{CHECKOUT_SESSION_ID}' || sessionId.includes('{CHECKOUT_SESSION_ID}')) {
+        console.error('Received template session ID that was not replaced by Stripe');
+        setLoading(false);
+        setError('Invalid session ID. Please check your order history for confirmation.');
+        return;
+      }
+      
+      fetchOrderDetails(sessionId);
+    } else {
+      setLoading(false);
+      setError('No session ID found. Unable to verify your order.');
+    }
+  }, [sessionId, fetchOrderDetails]);
   
   if (loading) {
     return (
