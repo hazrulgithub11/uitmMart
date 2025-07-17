@@ -63,7 +63,7 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: '/login',
-    signOut: '/logout',
+    signOut: 'https://uitmmart.site/login',
     error: '/error',
   },
   debug: true, // Enable debug mode to see more detailed errors

@@ -206,7 +206,7 @@ export default function SellerAccountSettings() {
   
   // Handle logging out
   const handleLogout = () => {
-    signOut({ callbackUrl: '/login' });
+    signOut({ callbackUrl: 'https://uitmmart.site/login' });
   };
   
   // Add handleDeleteAccount function
@@ -219,7 +219,7 @@ export default function SellerAccountSettings() {
       
       if (response.ok) {
         // Successfully deleted
-        signOut({ callbackUrl: '/login' });
+        signOut({ callbackUrl: 'https://uitmmart.site/login' });
       } else {
         const data = await response.json();
         throw new Error(data.error || 'Failed to delete account');

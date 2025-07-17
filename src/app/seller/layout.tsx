@@ -172,7 +172,7 @@ export default function SellerLayout({
 
   // Handler for confirming logout
   const confirmLogout = () => {
-    signOut({ callbackUrl: '/login' });
+    signOut({ callbackUrl: 'https://uitmmart.site/login' });
   };
 
   // Handler for canceling logout

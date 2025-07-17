@@ -203,7 +203,7 @@ export default function ProfilePage() {
       
       if (response.ok) {
         // Successfully deleted
-        signOut({ callbackUrl: '/login' });
+        signOut({ callbackUrl: 'https://uitmmart.site/login' });
       } else {
         const data = await response.json();
         throw new Error(data.error || 'Failed to delete account');
@@ -624,7 +624,7 @@ export default function ProfilePage() {
               </Link>
               
               <button 
-                onClick={() => signOut({ callbackUrl: '/login' })} 
+                onClick={() => signOut({ callbackUrl: 'https://uitmmart.site/login' })} 
                 className={`${cartoonStyle.card} flex items-center gap-3 w-full`}
               >
                 <div className="p-2 bg-red-100 rounded-full border-2 border-black">
