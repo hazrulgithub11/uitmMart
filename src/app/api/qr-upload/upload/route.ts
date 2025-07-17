@@ -23,16 +23,33 @@ function isImageFile(buffer: Buffer) {
 function generateUniqueFilename(originalName: string, type: string): string {
   console.log('[QR-UPLOAD-POST] generateUniqueFilename - originalName:', originalName, 'type:', type);
   
+  // Sanitize the original filename to prevent path traversal and special characters
+  const sanitizedName = originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
+  console.log('[QR-UPLOAD-POST] generateUniqueFilename - sanitizedName:', sanitizedName);
+  
   const timestamp = Date.now();
   const randomString = crypto.randomBytes(8).toString('hex');
-  const extension = path.extname(originalName);
+  const extension = path.extname(sanitizedName);
   
   console.log('[QR-UPLOAD-POST] generateUniqueFilename - timestamp:', timestamp);
   console.log('[QR-UPLOAD-POST] generateUniqueFilename - randomString:', randomString);
   console.log('[QR-UPLOAD-POST] generateUniqueFilename - extension:', extension);
   
-  const filename = `${type}_${timestamp}-${randomString}${extension}`;
+  // Ensure the type is safe for filename
+  const sanitizedType = type.replace(/[^a-zA-Z0-9]/g, '_');
+  
+  const filename = `${sanitizedType}_${timestamp}-${randomString}${extension}`;
   console.log('[QR-UPLOAD-POST] generateUniqueFilename - result:', filename);
+  
+  // Validate the generated filename
+  if (filename.length > 255) {
+    throw new Error('Generated filename is too long');
+  }
+  
+  // Check for invalid characters in the final filename
+  if (!/^[a-zA-Z0-9._-]+$/.test(filename)) {
+    throw new Error('Generated filename contains invalid characters');
+  }
   
   return filename;
 }
@@ -40,17 +57,40 @@ function generateUniqueFilename(originalName: string, type: string): string {
 export async function POST(request: NextRequest) {
   try {
     console.log('[QR-UPLOAD-POST] Starting file upload process');
+    console.log('[QR-UPLOAD-POST] Request headers:', Object.fromEntries(request.headers.entries()));
     
     // Get session ID from form data
-    const formData = await request.formData();
-    const sessionId = formData.get('sessionId') as string;
-    const file = formData.get('file') as File;
+    let formData: FormData;
+    let sessionId: string;
+    let file: File;
+    
+    try {
+      formData = await request.formData();
+      sessionId = formData.get('sessionId') as string;
+      file = formData.get('file') as File;
+      
+      console.log('[QR-UPLOAD-POST] FormData parsed successfully');
+      console.log('[QR-UPLOAD-POST] FormData entries:', Array.from(formData.entries()).map(([key, value]) => ({
+        key,
+        type: typeof value,
+        isFile: value instanceof File,
+        size: value instanceof File ? value.size : 'N/A'
+      })));
+      
+    } catch (err) {
+      console.error('[QR-UPLOAD-POST] Error parsing FormData:', err);
+      return NextResponse.json(
+        { error: 'Failed to parse form data' },
+        { status: 400 }
+      );
+    }
 
     console.log('[QR-UPLOAD-POST] Session ID:', sessionId);
     console.log('[QR-UPLOAD-POST] File info:', {
       name: file?.name,
       size: file?.size,
-      type: file?.type
+      type: file?.type,
+      lastModified: file?.lastModified
     });
 
     if (!sessionId) {
@@ -205,17 +245,68 @@ export async function POST(request: NextRequest) {
     // Save the file
     try {
       console.log('[QR-UPLOAD-POST] Writing file to disk');
+      console.log('[QR-UPLOAD-POST] File system info:', {
+        exists: existsSync(uploadsDir),
+        canWrite: true, // We'll check this with actual write
+        filePath: filePath,
+        bufferLength: buffer.length,
+        nodeVersion: process.version,
+        platform: process.platform
+      });
+      
+      // Try to write the file
       await writeFile(filePath, buffer);
+      
+      // Verify the file was written correctly
+      const stats = await import('fs/promises').then(fs => fs.stat(filePath));
       console.log('[QR-UPLOAD-POST] File written successfully');
+      console.log('[QR-UPLOAD-POST] File stats:', {
+        size: stats.size,
+        isFile: stats.isFile(),
+        mode: stats.mode,
+        created: stats.birthtime,
+        modified: stats.mtime
+      });
+      
+      // Verify file size matches buffer
+      if (stats.size !== buffer.length) {
+        throw new Error(`File size mismatch: expected ${buffer.length}, got ${stats.size}`);
+      }
+      
     } catch (err) {
       console.error('[QR-UPLOAD-POST] Error writing file:', err);
       console.error('[QR-UPLOAD-POST] Error details:', {
         message: err instanceof Error ? err.message : 'Unknown error',
         stack: err instanceof Error ? err.stack : 'No stack trace',
+        code: (err as any)?.code,
+        errno: (err as any)?.errno,
+        syscall: (err as any)?.syscall,
+        path: (err as any)?.path,
         filePath,
         fileName,
-        bufferSize: buffer.length
+        bufferSize: buffer.length,
+        uploadsDir,
+        dirExists: existsSync(uploadsDir)
       });
+      
+      // Try to provide more specific error messages
+      if ((err as any)?.code === 'ENOENT') {
+        return NextResponse.json(
+          { error: 'Upload directory does not exist' },
+          { status: 500 }
+        );
+      } else if ((err as any)?.code === 'EACCES') {
+        return NextResponse.json(
+          { error: 'Permission denied writing to upload directory' },
+          { status: 500 }
+        );
+      } else if ((err as any)?.code === 'ENOSPC') {
+        return NextResponse.json(
+          { error: 'No space left on device' },
+          { status: 500 }
+        );
+      }
+      
       return NextResponse.json(
         { error: 'Failed to save the file' },
         { status: 500 }
