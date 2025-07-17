@@ -27,6 +27,8 @@ export default function SellerPaymentPage() {
   } | null>(null);
   const [webhookSetup, setWebhookSetup] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
+  const [resetting, setResetting] = useState<boolean>(false);
+  const [accountId, setAccountId] = useState<string>('');
   
   // Base URL for the webhook
   const baseUrl = typeof window !== 'undefined' 
@@ -54,6 +56,42 @@ export default function SellerPaymentPage() {
       });
     } catch (err) {
       console.error('Failed to update webhook status:', err);
+    }
+  };
+
+  // Handle reset Stripe connection
+  const handleResetConnection = async () => {
+    if (!confirm('Are you sure you want to reset your Stripe connection? This will clear your current progress and allow you to start fresh.')) {
+      return;
+    }
+
+    try {
+      setResetting(true);
+      setError(null);
+      
+      const response = await fetch('/api/seller/stripe/reset-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (response.ok) {
+        // Reset local state
+        setStripeConnected(false);
+        setStripeAccountId(null);
+        setCapabilities(null);
+        setWebhookSetup(false);
+        
+        // Show success message briefly
+        alert('Stripe connection reset successfully. You can now start the connection process again.');
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || 'Failed to reset connection');
+      }
+    } catch (err) {
+      console.error('Error resetting connection:', err);
+      setError('Failed to reset connection');
+    } finally {
+      setResetting(false);
     }
   };
   
@@ -84,53 +122,96 @@ export default function SellerPaymentPage() {
   
   // URL parameters
   useEffect(() => {
+    const handleUrlParams = async () => {
     // Check URL for success or error parameters
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('success') === 'true') {
+      const success = urlParams.get('success');
+      const error = urlParams.get('error');
+      const accountId = urlParams.get('account_id');
+      
+      if (success === 'true' && accountId) {
+        // User completed onboarding, verify and save the account
+        try {
+          const response = await fetch('/api/seller/stripe/complete-onboarding', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ accountId }),
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
       setStripeConnected(true);
-      // Refresh the page status to get the latest account info
+            setStripeAccountId(data.accountId);
+            setCapabilities(data.capabilities);
+            // Clean up URL parameters
+            window.history.replaceState({}, '', '/seller/payment');
+          } else {
+            const errorData = await response.json();
+            setError(errorData.error || 'Failed to complete onboarding');
+          }
+        } catch (err) {
+          console.error('Error completing onboarding:', err);
+          setError('Failed to complete onboarding');
+        }
+      } else if (success === 'true') {
+        // Old success flow without account_id - refresh status
       window.location.href = '/seller/payment';
-    } else if (urlParams.get('error') === 'true') {
+      } else if (error === 'true') {
       setError('There was an error connecting your Stripe account. Please try again.');
+      }
+      
       setLoading(false);
-    }
+    };
+    
+    handleUrlParams();
   }, []);
 
-  // Handle Stripe connection
-  const handleConnectStripe = async () => {
+
+
+  // Handle connecting existing Stripe account
+  const handleConnectExistingAccount = async () => {
+    if (!accountId.trim()) {
+      setError('Please enter your Stripe account ID');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
       
-      // Use the API endpoint which will create an account and onboarding link
-      const response = await fetch('/api/seller/stripe/create-account', { 
+      const response = await fetch('/api/seller/stripe/connect-existing-account', { 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({ accountId: accountId.trim() })
       });
       
       if (response.ok) {
         const data = await response.json();
-        if (data.url) {
-          window.location.href = data.url;
-        } else {
-          throw new Error('No redirect URL returned from API');
-        }
+        console.log('Account connected:', data);
+        
+        // Update UI state
+        setStripeConnected(true);
+        setStripeAccountId(data.accountId);
+        setCapabilities(data.accountDetails.capabilities);
+        setAccountId(''); // Clear input
+        setLoading(false); // Stop loading state
+        
+        // Show success message
+        alert('Stripe account connected successfully!');
+        
       } else {
-        let errorMessage = 'Failed to create Stripe account';
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.error || errorData.details || errorMessage;
-        } catch (parseError) {
-          console.error('Error parsing error response:', parseError);
-        }
-        setError(errorMessage);
+        const errorData = await response.json();
+        console.error('Connection error:', errorData);
+        setError(errorData.error || 'Failed to connect account');
         setLoading(false);
       }
     } catch (error) {
-      console.error('Error connecting to Stripe:', error);
-      setError(error instanceof Error ? error.message : 'An unexpected error occurred');
+      console.error('Error connecting account:', error);
+      setError(error instanceof Error ? error.message : 'Failed to connect account');
       setLoading(false);
     }
   };
@@ -140,14 +221,14 @@ export default function SellerPaymentPage() {
       <h1 className={`${cartoonStyle.heading} mb-8 text-black`}>Payment Settings</h1>
 
       {/* API Status Alert */}
-      <div className="bg-blue-50 border-3 border-black rounded-lg p-4 mb-6 flex items-start">
-        <Info className="h-6 w-6 text-blue-500 mr-2 mt-0.5 flex-shrink-0" />
+      <div className="bg-green-50 border-3 border-black rounded-lg p-4 mb-6 flex items-start">
+        <Info className="h-6 w-6 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
         <div>
-          <p className="font-medium text-blue-700">
-            API Implementation Note
+          <p className="font-medium text-green-700">
+            Simplified Integration
           </p>
-          <p className="text-blue-600 text-sm mt-1">
-            The Stripe Connect integration requires additional API setup and database migration. This page shows the UI design and explains how the integration will work.
+          <p className="text-green-600 text-sm mt-1">
+            We've simplified the Stripe Connect integration. Now you create your Stripe account first, then connect it using your account ID. This avoids the complex onboarding issues.
           </p>
         </div>
       </div>
@@ -275,6 +356,12 @@ export default function SellerPaymentPage() {
                 You need to connect a Stripe account to receive payments
               </p>
             </div>
+            <div className="mt-2 text-sm text-yellow-600">
+              <p>
+                <strong>New simplified process:</strong> Create your Stripe account first, then connect it using your account ID. 
+                This avoids the complex onboarding issues we experienced before.
+              </p>
+            </div>
           </div>
         )}
 
@@ -302,24 +389,87 @@ export default function SellerPaymentPage() {
           </div>
         </div>
 
-        {!stripeConnected && (
-          <Button 
-            onClick={handleConnectStripe} 
-            disabled={loading}
-            className={`${cartoonStyle.buttonPrimary} px-6 py-3 text-lg flex items-center`}
-          >
-            {loading ? (
-              <>
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent mr-2"></div>
-                <span>Connecting...</span>
-              </>
-            ) : (
-              <>
-                <CreditCard className="mr-2 h-5 w-5" />
-                <span>Connect with Stripe</span>
-              </>
-            )}
-          </Button>
+                {!stripeConnected && (
+          <div className="space-y-6">
+            {/* Step 1: Create Stripe Account */}
+            <div className="bg-blue-50 border-3 border-black rounded-lg p-6">
+              <h3 className="text-lg font-bold text-black mb-4">Step 1: Create Your Stripe Account</h3>
+              <ol className="list-decimal pl-6 space-y-2 text-gray-700 mb-4">
+                <li>Go to <Link href="https://stripe.com/my" className="text-blue-600 underline" target="_blank">stripe.com/my</Link> and create a new account</li>
+                <li>Complete the account verification process</li>
+                <li>Make sure your account is activated and ready to accept payments</li>
+                <li>Go to your <Link href="https://dashboard.stripe.com/settings/account" className="text-blue-600 underline" target="_blank">Stripe Dashboard → Settings → Account</Link></li>
+                <li>Copy your <strong>Account ID</strong> (starts with "acct_")</li>
+              </ol>
+              <div className="bg-yellow-100 border-2 border-yellow-400 rounded-lg p-3">
+                <p className="text-sm text-yellow-800">
+                  <strong>Important:</strong> Your account ID should look like: <code>acct_1A2B3C4D5E6F7G8H</code>
+                </p>
+              </div>
+            </div>
+
+            {/* Step 2: Connect Your Account */}
+            <div className="bg-green-50 border-3 border-black rounded-lg p-6">
+              <h3 className="text-lg font-bold text-black mb-4">Step 2: Connect Your Account to UitmMart</h3>
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="accountId" className="block text-sm font-medium text-gray-700 mb-2">
+                    Enter your Stripe Account ID:
+                  </label>
+                  <input
+                    type="text"
+                    id="accountId"
+                    value={accountId}
+                    onChange={(e) => setAccountId(e.target.value)}
+                    placeholder="acct_1A2B3C4D5E6F7G8H"
+                    className={`${cartoonStyle.input} text-sm`}
+                    disabled={loading}
+                  />
+                </div>
+                
+                <Button 
+                  onClick={handleConnectExistingAccount} 
+                  disabled={loading || !accountId.trim()}
+                  className={`${cartoonStyle.buttonPrimary} px-6 py-3 text-lg flex items-center`}
+                >
+                  {loading ? (
+                    <>
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent mr-2"></div>
+                      <span>Connecting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="mr-2 h-5 w-5" />
+                      <span>Connect Account</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Reset option */}
+            <div className="border-t border-gray-200 pt-4">
+              <p className="text-sm text-gray-600 mb-3">
+                <strong>Need to reset?</strong> If you have an existing connection that's not working:
+              </p>
+              <Button 
+                onClick={handleResetConnection} 
+                disabled={resetting || loading}
+                className={`${cartoonStyle.button} px-4 py-2 text-sm flex items-center text-red-600 hover:text-red-700`}
+              >
+                {resetting ? (
+                  <>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent mr-2"></div>
+                    <span>Resetting...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Reset Connection</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
         )}
       </div>
 
@@ -336,9 +486,26 @@ export default function SellerPaymentPage() {
           </div>
           
           <div>
-            <h4 className="font-bold text-black">Do I need to create a new Stripe account?</h4>
+            <h4 className="font-bold text-black">How do I create a Stripe account?</h4>
             <p className="text-gray-700 mt-1">
-              If you don&apos;t have a Stripe account yet, you&apos;ll create one during the connection process. If you already have one, you can link it to UitmMart.
+              Go to <Link href="https://stripe.com/my" className="text-blue-600 underline" target="_blank">stripe.com/my</Link> and create a new account. 
+              Complete the verification process and make sure your account is activated. You'll need to provide your business information and banking details.
+            </p>
+          </div>
+          
+          <div>
+            <h4 className="font-bold text-black">Where do I find my Stripe Account ID?</h4>
+            <p className="text-gray-700 mt-1">
+              After creating your Stripe account, go to your <Link href="https://dashboard.stripe.com/settings/account" className="text-blue-600 underline" target="_blank">Stripe Dashboard → Settings → Account</Link>. 
+              Your Account ID will be displayed at the top of the page and starts with "acct_".
+            </p>
+          </div>
+          
+          <div>
+            <h4 className="font-bold text-black">Why did we switch to this approach?</h4>
+            <p className="text-gray-700 mt-1">
+              We experienced issues with Stripe's automatic account creation flow in Malaysia, where it would force users to sign in instead of creating new accounts. 
+              By having users create their own accounts first, we avoid these onboarding complications and ensure a smoother experience.
             </p>
           </div>
           
