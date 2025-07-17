@@ -109,6 +109,14 @@ function QRUploadContent() {
   const handleUpload = async () => {
     if (!selectedFile || !sessionInfo) return;
 
+    console.log('[QR-UPLOAD-CLIENT] Starting upload process');
+    console.log('[QR-UPLOAD-CLIENT] File info:', {
+      name: selectedFile.name,
+      size: selectedFile.size,
+      type: selectedFile.type
+    });
+    console.log('[QR-UPLOAD-CLIENT] Session info:', sessionInfo);
+
     setIsUploading(true);
     setMessage(null);
 
@@ -117,17 +125,25 @@ function QRUploadContent() {
       formData.append('file', selectedFile);
       formData.append('sessionId', sessionInfo.sessionId);
 
+      console.log('[QR-UPLOAD-CLIENT] FormData created, making request to /api/qr-upload/upload');
+
       const response = await fetch('/api/qr-upload/upload', {
         method: 'POST',
         body: formData,
       });
 
+      console.log('[QR-UPLOAD-CLIENT] Upload response status:', response.status);
+      console.log('[QR-UPLOAD-CLIENT] Upload response ok:', response.ok);
+
       if (!response.ok) {
         const error = await response.json();
+        console.error('[QR-UPLOAD-CLIENT] Upload error response:', error);
         throw new Error(error.error || 'Upload failed');
       }
 
       const result = await response.json();
+      console.log('[QR-UPLOAD-CLIENT] Upload success response:', result);
+      
       setMessage({ 
         type: 'success', 
         text: result.message || 'Upload successful!' 
@@ -136,7 +152,9 @@ function QRUploadContent() {
       // Update session info
       setSessionInfo(prev => prev ? { ...prev, status: 'uploaded' } : null);
     } catch (error) {
-      console.error('Upload error:', error);
+      console.error('[QR-UPLOAD-CLIENT] Upload error:', error);
+      console.error('[QR-UPLOAD-CLIENT] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      
       setMessage({ 
         type: 'error', 
         text: error instanceof Error ? error.message : 'Upload failed' 
