@@ -60,36 +60,16 @@ export async function POST() {
       );
     }
     
-    // Use either environment variable for base URL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
-                   process.env.NEXT_PUBLIC_BASE_URL || 
-                   'http://localhost:3000';
-    
     // Check if the seller already has a Stripe account
     if (user.shop.stripeAccountId) {
-      console.log('Existing Stripe account found, checking status');
+      console.log('Existing Stripe account found, creating account link');
       
-      try {
-        // Check the actual account status with Stripe
-        const account = await stripe.accounts.retrieve(user.shop.stripeAccountId);
-        
-        // Check if account is fully onboarded
-        if (account.details_submitted && account.charges_enabled && account.payouts_enabled) {
-          console.log('Account is fully onboarded, creating account link for updates');
+      // Use either environment variable
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                     process.env.NEXT_PUBLIC_BASE_URL || 
+                     'http://localhost:3000';
       
-          // Account is fully set up, create account link for updates
-          const accountLink = await stripe.accountLinks.create({
-            account: user.shop.stripeAccountId,
-            refresh_url: `${baseUrl}/seller/payment?error=true`,
-            return_url: `${baseUrl}/seller/payment?success=true`,
-            type: 'account_onboarding',
-          });
-          
-          return NextResponse.json({ url: accountLink.url });
-        } else {
-          console.log('Account exists but onboarding not complete, creating onboarding link');
-          
-          // Account exists but onboarding is not complete, create onboarding link
+      // If they do, create an account link to let them update their account
       const accountLink = await stripe.accountLinks.create({
         account: user.shop.stripeAccountId,
         refresh_url: `${baseUrl}/seller/payment?error=true`,
@@ -98,41 +78,28 @@ export async function POST() {
       });
       
       return NextResponse.json({ url: accountLink.url });
-        }
-      } catch (stripeError) {
-        console.error('Error checking Stripe account status:', stripeError);
-        
-        // If account doesn't exist in Stripe but we have an ID, clear it
-        if (stripeError instanceof Stripe.errors.StripeError && stripeError.code === 'resource_missing') {
-          console.log('Stripe account not found, clearing invalid account ID');
-          
-          await prisma.shop.update({
-            where: { id: user.shop.id },
-            data: { stripeAccountId: null },
-          });
-          
-          // Fall through to create new account
-        } else {
-          return NextResponse.json(
-            { error: 'Failed to check Stripe account status' },
-            { status: 500 }
-          );
-        }
-      }
     }
     
     console.log('Creating new Stripe account');
     
+    // Use either environment variable for base URL
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                   process.env.NEXT_PUBLIC_BASE_URL || 
+                   'http://localhost:3000';
+    
     // Create a new Stripe Connected Account
-    // Don't pre-fill ANY information to ensure fresh account creation
     const account = await stripe.accounts.create({
       type: 'standard',
       country: 'MY', // Malaysia, change as needed
-      // Completely avoid pre-filling email, business info, etc. to force new account creation
+      email: user.email || undefined,
+      business_type: 'individual',
+      business_profile: {
+        name: user.shop.name,
+        url: `${baseUrl}/shops/${user.shop.id}`,
+      },
       metadata: {
         userId: user.id.toString(),
         shopId: user.shop.id.toString(),
-        shopName: user.shop.name, // Store shop name in metadata only
       },
       capabilities: {
         card_payments: { requested: true },
@@ -142,15 +109,49 @@ export async function POST() {
     
     console.log('Stripe account created:', account.id);
     
-    // DON'T save the account ID to database yet - wait for onboarding completion
-    // Instead, store it temporarily for onboarding completion verification
+    try {
+      // Update the shop with the Stripe account ID
+      await prisma.shop.update({
+        where: { id: user.shop.id },
+        data: { 
+          stripeAccountId: account.id 
+        },
+      });
+      
+      console.log('Shop updated with Stripe account ID');
+      
+      // Register a webhook for this connected account
+      try {
+        console.log('Registering webhook for connected account...');
+        
+        const webhook = await stripe.webhookEndpoints.create({
+          url: `${baseUrl}/api/webhook/stripe`,
+          enabled_events: [
+            'checkout.session.completed',
+            'payment_intent.succeeded',
+            'payment_intent.payment_failed'
+          ],
+          api_version: '2023-10-16',
+          description: `Webhook for UitmMart Seller: ${user.shop.name}`
+        }, {
+          stripeAccount: account.id
+        });
+        
+        console.log(`Successfully registered webhook for connected account: ${webhook.id}`);
+      } catch (webhookError) {
+        console.error('Failed to register webhook for connected account:', webhookError);
+        // Continue despite webhook registration failure - we'll try again later
+      }
+    } catch (updateError) {
+      console.error('Error updating shop with Stripe account ID:', updateError);
+      // Continue even if the database update fails
+    }
     
     // Create an account link for onboarding
-    // Use account_onboarding type which should allow new account creation
     const accountLink = await stripe.accountLinks.create({
       account: account.id,
       refresh_url: `${baseUrl}/seller/payment?error=true`,
-      return_url: `${baseUrl}/seller/payment?success=true&account_id=${account.id}`,
+      return_url: `${baseUrl}/seller/payment?success=true`,
       type: 'account_onboarding',
     });
     

@@ -49,7 +49,6 @@ model Shop {
   updatedAt       DateTime  @updatedAt
   sellerId        Int       @unique
   stripeAccountId String?
-  webhookSetup    Boolean   @default(false)
   products        Product[]
   seller          User      @relation(fields: [sellerId], references: [id], onDelete: Cascade)
   orders          Order[]   @relation("SellerOrders")
