@@ -65,6 +65,7 @@ export default function QRUploadModal({ isOpen, onClose, onSuccess, type }: QRUp
 
   const generateQRCode = useCallback(async () => {
     try {
+      console.log('[QR-MODAL] Starting QR code generation for type:', type);
       setStatus('generating');
       setMessage('Generating QR code...');
 
@@ -76,12 +77,17 @@ export default function QRUploadModal({ isOpen, onClose, onSuccess, type }: QRUp
         body: JSON.stringify({ type }),
       });
 
+      console.log('[QR-MODAL] Generate session response status:', response.status);
+      console.log('[QR-MODAL] Generate session response ok:', response.ok);
+
       if (!response.ok) {
         const error = await response.json();
+        console.error('[QR-MODAL] Generate session error:', error);
         throw new Error(error.error || 'Failed to generate QR code');
       }
 
       const data = await response.json();
+      console.log('[QR-MODAL] Generated session data:', data);
       setSessionData(data);
       setStatus('ready');
       setMessage('Scan the QR code with your phone to upload your image');
@@ -90,10 +96,11 @@ export default function QRUploadModal({ isOpen, onClose, onSuccess, type }: QRUp
       const expiresAt = new Date(data.expiresAt).getTime();
       const now = new Date().getTime();
       const remaining = Math.max(0, Math.floor((expiresAt - now) / 1000));
+      console.log('[QR-MODAL] Session expires in:', remaining, 'seconds');
       setTimeRemaining(remaining);
 
     } catch (error) {
-      console.error('Error generating QR code:', error);
+      console.error('[QR-MODAL] Error generating QR code:', error);
       setStatus('error');
       setMessage(error instanceof Error ? error.message : 'Failed to generate QR code');
     }
@@ -101,15 +108,24 @@ export default function QRUploadModal({ isOpen, onClose, onSuccess, type }: QRUp
 
   const checkSessionStatus = useCallback(async (currentSessionData: SessionData) => {
     try {
+      console.log('[QR-MODAL] Checking session status for:', currentSessionData.sessionId);
+      
       const response = await fetch(`/api/qr-upload/generate-session?sessionId=${currentSessionData.sessionId}`);
       
+      console.log('[QR-MODAL] Status check response status:', response.status);
+      console.log('[QR-MODAL] Status check response ok:', response.ok);
+      
       if (!response.ok) {
+        const error = await response.json();
+        console.error('[QR-MODAL] Status check error:', error);
         throw new Error('Failed to check session status');
       }
 
       const status: SessionStatus = await response.json();
+      console.log('[QR-MODAL] Session status:', status);
 
       if (status.status === 'uploaded' && status.uploadedImageUrl) {
+        console.log('[QR-MODAL] Image uploaded successfully:', status.uploadedImageUrl);
         setStatus('uploaded');
         setMessage('Image uploaded successfully!');
         
@@ -129,6 +145,7 @@ export default function QRUploadModal({ isOpen, onClose, onSuccess, type }: QRUp
           onClose();
         }, 2000);
       } else if (status.status === 'expired') {
+        console.log('[QR-MODAL] Session expired');
         setStatus('expired');
         setMessage('Session has expired. Please try again.');
         
@@ -142,7 +159,7 @@ export default function QRUploadModal({ isOpen, onClose, onSuccess, type }: QRUp
         }
       }
     } catch (error) {
-      console.error('Error checking session status:', error);
+      console.error('[QR-MODAL] Error checking session status:', error);
       // Don't show error for polling failures to avoid spam
     }
   }, [onSuccess, onClose]);

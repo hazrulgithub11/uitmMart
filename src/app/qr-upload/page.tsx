@@ -37,14 +37,21 @@ function QRUploadContent() {
 
   const fetchSessionInfo = useCallback(async () => {
     try {
+      console.log('[QR-UPLOAD-CLIENT] Fetching session info for sessionId:', sessionId);
+      
       const response = await fetch(`/api/qr-upload/upload?sessionId=${sessionId}`);
+      
+      console.log('[QR-UPLOAD-CLIENT] Response status:', response.status);
+      console.log('[QR-UPLOAD-CLIENT] Response ok:', response.ok);
       
       if (!response.ok) {
         const error = await response.json();
+        console.error('[QR-UPLOAD-CLIENT] Error response:', error);
         throw new Error(error.error || 'Failed to fetch session info');
       }
       
       const data = await response.json();
+      console.log('[QR-UPLOAD-CLIENT] Session data received:', data);
       setSessionInfo(data);
       
       if (data.status === 'uploaded') {
@@ -56,7 +63,7 @@ function QRUploadContent() {
         setMessage({ type: 'error', text: 'This upload session has expired' });
       }
     } catch (error) {
-      console.error('Error fetching session info:', error);
+      console.error('[QR-UPLOAD-CLIENT] Error fetching session info:', error);
       setMessage({ 
         type: 'error', 
         text: error instanceof Error ? error.message : 'Failed to load session' 

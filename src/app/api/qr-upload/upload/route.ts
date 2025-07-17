@@ -161,7 +161,11 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const sessionId = searchParams.get('sessionId');
 
+    console.log('[QR-UPLOAD-UPLOAD] GET /api/qr-upload/upload - Checking session:', sessionId);
+    console.log('[QR-UPLOAD-UPLOAD] Total sessions in memory:', uploadSessions.size);
+
     if (!sessionId) {
+      console.log('[QR-UPLOAD-UPLOAD] No session ID provided');
       return NextResponse.json(
         { error: 'Session ID is required' },
         { status: 400 }
@@ -171,14 +175,25 @@ export async function GET(request: NextRequest) {
     const session = uploadSessions.get(sessionId);
     
     if (!session) {
+      console.log('[QR-UPLOAD-UPLOAD] Session not found in memory:', sessionId);
+      console.log('[QR-UPLOAD-UPLOAD] Available sessions:', Array.from(uploadSessions.keys()));
       return NextResponse.json(
         { error: 'Session not found or expired' },
         { status: 404 }
       );
     }
 
+    console.log('[QR-UPLOAD-UPLOAD] Session found:', {
+      id: session.id,
+      status: session.status,
+      type: session.type,
+      expiresAt: session.expiresAt,
+      isExpired: session.expiresAt < new Date()
+    });
+
     // Check if session is expired
     if (session.expiresAt < new Date()) {
+      console.log('[QR-UPLOAD-UPLOAD] Session expired, removing from memory');
       uploadSessions.delete(sessionId);
       return NextResponse.json(
         { error: 'Session expired' },
@@ -194,7 +209,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error retrieving session info:', error);
+    console.error('[QR-UPLOAD-UPLOAD] Error retrieving session info:', error);
     return NextResponse.json(
       { error: 'Failed to retrieve session info' },
       { status: 500 }
