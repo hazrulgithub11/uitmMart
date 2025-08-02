@@ -1,87 +1,371 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🏪 UiTMMart - University Marketplace Platform
 
-## Getting Started
+*Empowering UiTM students with a secure and intelligent marketplace ecosystem*
 
-First, run the development server:
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Next.js](https://img.shields.io/badge/Next.js-14.x-black)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue)
+![Prisma](https://img.shields.io/badge/Prisma-ORM-2D3748)
+![Stripe](https://img.shields.io/badge/Stripe-Payment-635BFF)
+
+## 📖 Project Description
+
+UiTMMart is a comprehensive university marketplace platform specifically designed for Universiti Teknologi MARA (UiTM) students. It provides a secure, AI-powered trading environment where students can buy and sell items while maintaining campus community trust through advanced verification systems.
+
+### 🎯 Problem Statement
+University students often struggle with:
+- Finding reliable platforms to trade items within their campus community
+- Verifying the authenticity of student sellers/buyers
+- Managing secure payments and order tracking
+- Establishing trust in peer-to-peer transactions
+
+### 💡 Our Solution
+UiTMMart addresses these challenges by providing:
+- **AI-powered student verification** using OCR technology for student ID validation
+- **Integrated payment processing** with Stripe for secure transactions
+- **Real-time order tracking** with automatic courier detection
+- **Community-focused marketplace** exclusively for UiTM students
+- **Advanced admin controls** for platform management and security
+
+## ✨ Key Features
+
+### 🛍️ Marketplace Core
+- **Product Catalog**: Browse and search products with advanced filtering
+- **Shop Management**: Sellers can create and customize their virtual shops
+- **Shopping Cart**: Full-featured cart with bulk operations
+- **Secure Checkout**: Stripe-integrated payment processing
+- **Order Management**: Complete order lifecycle tracking
+
+### 🔐 Security & Verification
+- **Student ID OCR Verification**: AI-powered student ID scanning and validation
+- **Facial Recognition**: Additional security layer for seller verification
+- **Secure Authentication**: NextAuth.js integration with multiple providers
+- **Admin Moderation**: Comprehensive admin dashboard for user and content management
+
+### 📱 User Experience
+- **Real-time Chat**: Integrated messaging system for buyer-seller communication
+- **Order Tracking**: Automatic courier detection and status updates via Tracking.my API
+- **Rating System**: Comprehensive review and rating system for products and sellers
+- **Responsive Design**: Mobile-first approach with modern UI/UX
+
+### 🎛️ Admin Features
+- **User Management**: Complete control over buyer and seller accounts
+- **Content Moderation**: Tools for managing products, shops, and user content
+- **Analytics Dashboard**: Insights into platform usage and performance
+- **Webhook Management**: Integration controls for external services
+
+## 🎭 Demo
+
+### Screenshots
+![Homepage](./public/images/demo-homepage.png)
+*Homepage showcasing featured products and categories*
+
+![Student Verification](./public/images/demo-verification.png)
+*AI-powered student ID verification process*
+
+![Seller Dashboard](./public/images/demo-seller-dashboard.png)
+*Comprehensive seller dashboard with analytics*
+
+### Live Demo
+🌐 **Production**: [https://uitm-mart.site](https://uitm-mart.site)
+🧪 **Staging**: [Contact for staging access](#contact)
+
+## 🏗️ Tech Stack & Architecture
+
+### Frontend
+- **Framework**: Next.js 14 (App Router)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS + Shadcn/ui components
+- **State Management**: React hooks + Custom providers
+
+### Backend
+- **API**: Next.js API Routes
+- **Database**: PostgreSQL with Prisma ORM
+- **Authentication**: NextAuth.js
+- **File Storage**: Local file system (configurable)
+
+### External Services
+- **Payments**: Stripe Connect for multi-vendor payments
+- **Tracking**: Tracking.my API for courier detection and status updates
+- **OCR**: Custom implementation for student ID verification
+- **Email**: SMTP integration for notifications
+
+### Infrastructure
+- **Containerization**: Docker & Docker Compose
+- **Reverse Proxy**: Nginx
+- **SSL**: Let's Encrypt with Certbot
+- **Deployment**: Self-hosted with automated SSL renewal
+
+### Architecture Overview
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Frontend      │    │   Backend API   │    │   Database      │
+│   (Next.js)     │◄──►│   (Next.js)     │◄──►│   (PostgreSQL)  │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       
+         ▼                       ▼                       
+┌─────────────────┐    ┌─────────────────┐              
+│   External      │    │   File Storage  │              
+│   Services      │    │   (Local/Cloud) │              
+│   (Stripe, etc) │    │                 │              
+└─────────────────┘    └─────────────────┘              
+```
+
+## 🚀 Installation & Setup
+
+### Prerequisites
+- **Node.js**: >= 18.0.0
+- **npm/yarn**: Latest version
+- **PostgreSQL**: >= 13.0
+- **Docker** (optional): For containerized deployment
+
+### Quick Start
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd uitmMart
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   # or
+   yarn install
+   ```
+
+3. **Environment setup**
+   ```bash
+   cp .env.example .env.local
+   ```
+
+4. **Database setup**
+   ```bash
+   # Generate Prisma client
+   npx prisma generate
+   
+   # Run migrations
+   npx prisma migrate deploy
+   
+   # Seed database (optional)
+   npx prisma db seed
+   ```
+
+5. **Start development server**
+   ```bash
+   npm run dev
+   # or
+   yarn dev
+   ```
+
+6. **Access the application**
+   - Frontend: http://localhost:3000
+   - Admin Panel: http://localhost:3000/admin
+
+### Docker Deployment
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Build and start services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 📋 Usage Guide
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### For Students (Buyers)
+1. **Registration**: Sign up with university email
+2. **Verification**: Complete student ID verification process
+3. **Shopping**: Browse products, add to cart, and checkout
+4. **Communication**: Chat with sellers for inquiries
+5. **Order Tracking**: Monitor order status and delivery
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### For Sellers
+1. **Seller Registration**: Apply to become a verified seller
+2. **Shop Setup**: Create and customize your shop profile
+3. **Product Management**: Add, edit, and manage your inventory
+4. **Order Processing**: Handle incoming orders and shipping
+5. **Analytics**: Monitor sales performance and customer feedback
 
-## Tracking Integration
+### For Administrators
+1. **User Management**: Approve/suspend users and sellers
+2. **Content Moderation**: Review and moderate products and shops
+3. **System Monitoring**: Track platform health and performance
+4. **Configuration**: Manage system settings and integrations
 
-This project includes integration with tracking.my API for automatic courier detection and tracking status updates:
+## ⚙️ Configuration
 
-### Setting Up Tracking.my API
+### Environment Variables
 
-1. Register for a seller account at [tracking.my](https://tracking.my/)
-2. Navigate to your API settings page to get your API key
-3. Add your API key to the `.env.local` file:
+Create a `.env.local` file with the following variables:
 
+```env
+# Database
+DATABASE_URL="postgresql://username:password@localhost:5432/uitmmart"
+
+# NextAuth
+NEXTAUTH_SECRET="your-nextauth-secret"
+NEXTAUTH_URL="http://localhost:3000"
+
+# Stripe
+STRIPE_PUBLISHABLE_KEY="pk_test_..."
+STRIPE_SECRET_KEY="sk_test_..."
+STRIPE_WEBHOOK_SECRET="whsec_..."
+
+# Tracking.my API
+TRACKING_MY_API_KEY="your-tracking-api-key"
+
+# Email Configuration
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT=587
+SMTP_USER="your-email@gmail.com"
+SMTP_PASS="your-app-password"
+
+# File Upload
+UPLOAD_DIR="./public/uploads"
+MAX_FILE_SIZE=5242880
+
+# Security
+ENCRYPTION_KEY="your-32-character-encryption-key"
 ```
-TRACKING_MY_API_KEY="your-tracking-my-api-key"
+
+### API Keys Setup
+
+1. **Stripe Account**: 
+   - Create account at [stripe.com](https://stripe.com)
+   - Enable Stripe Connect for multi-vendor payments
+   - Add webhook endpoint: `https://yourdomain.com/api/stripe/webhook`
+
+2. **Tracking.my API**:
+   - Register at [tracking.my](https://tracking.my)
+   - Generate API key from dashboard
+   - Configure webhook URL for order updates
+
+## 🧪 Testing
+
+### Running Tests
+```bash
+# Unit tests
+npm run test
+
+# Integration tests
+npm run test:integration
+
+# E2E tests
+npm run test:e2e
+
+# Coverage report
+npm run test:coverage
 ```
 
-4. Restart your server after adding the API key
+### Test Environment Setup
+```bash
+# Setup test database
+createdb uitmmart_test
 
-### Troubleshooting Webhook Registration
+# Run test migrations
+DATABASE_URL="postgresql://username:password@localhost:5432/uitmmart_test" npx prisma migrate deploy
+```
 
-If you see the "Failed to register webhook" error in the admin dashboard, check the following:
+## 🔒 Security Considerations
 
-1. Verify that you have set up the `TRACKING_MY_API_KEY` in your `.env.local` file
-2. Make sure your application is deployed to a publicly accessible URL (tracking.my cannot send webhooks to localhost)
-3. Check that your API key is valid and has permission to register webhooks
-4. If still having issues, contact tracking.my support with your API key details
+### OCR & AI Verification
+- **Student ID Scanning**: Uses AI to extract and validate student information
+- **Facial Recognition**: Optional secondary verification for sellers
+- **Data Protection**: All verification data is encrypted and securely stored
+- **Privacy Compliance**: Adheres to data protection regulations
 
-### Automatic Courier Detection
+### Security Measures
+- **Input Validation**: All user inputs are sanitized and validated
+- **SQL Injection Protection**: Prisma ORM provides built-in protection
+- **XSS Prevention**: React's built-in XSS protection + additional sanitization
+- **CSRF Protection**: NextAuth.js handles CSRF protection
+- **Rate Limiting**: API endpoints are rate-limited to prevent abuse
 
-The system automatically detects courier services when a tracking number is entered in the seller dashboard:
+### Best Practices
+- Regular security audits and dependency updates
+- Encrypted storage of sensitive data
+- Secure file upload with type validation
+- HTTPS-only communication in production
 
-1. Enter a tracking number when updating an order
-2. The system will call tracking.my API to detect the courier
-3. The detected courier information will be displayed and saved with the order
+## 🗺️ Roadmap
 
-### Webhook Integration
+### Phase 1 - Current Features ✅
+- [x] Core marketplace functionality
+- [x] Student verification system
+- [x] Payment integration
+- [x] Order tracking
+- [x] Admin dashboard
 
-For automatic order status updates based on tracking status:
+### Phase 2 - Q2 2024
+- [ ] Mobile application (React Native)
+- [ ] Advanced analytics and reporting
+- [ ] Bulk product management
+- [ ] Enhanced search with AI recommendations
 
-1. Deploy your application to a publicly accessible URL
-2. Access the admin tracking page at `/admin/tracking`
-3. Register your webhook URL with tracking.my
-4. The system will automatically update order statuses when tracking statuses change
+### Phase 3 - Q3 2024
+- [ ] Multi-campus support
+- [ ] Social features and community building
+- [ ] Advanced fraud detection
+- [ ] API for third-party integrations
 
-## Learn More
+### Phase 4 - Q4 2024
+- [ ] Machine learning recommendations
+- [ ] Inventory management system
+- [ ] Advanced seller tools
+- [ ] Performance optimizations
 
-## Admin credentials
+## 🤝 Contributing
 
-adminEmail = 'admin@uitmmart.com';
-adminPassword = 'Admin@123';
-adminUsername = 'admin';
+We welcome contributions from the UiTM community! Please read our [Contributing Guidelines](CONTRIBUTING.md) before submitting pull requests.
 
-To learn more about Next.js, take a look at the following resources:
+### Development Workflow
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Code Standards
+- Follow TypeScript best practices
+- Use Prettier for code formatting
+- Write tests for new features
+- Update documentation as needed
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 📄 License
 
-## Deploy on Vercel
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 👥 Authors & Contact
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Development Team
+- **Lead Developer**: [Your Name](mailto:your.email@uitm.edu.my)
+- **UI/UX Designer**: [Designer Name](mailto:designer@uitm.edu.my)
+- **Project Manager**: [PM Name](mailto:pm@uitm.edu.my)
 
+### Support & Contact
+- 📧 **General Inquiries**: support@uitmmart.com
+- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/your-repo/issues)
+- 💬 **Discord Community**: [Join our Discord](https://discord.gg/uitmmart)
+- 📱 **Social Media**: [@UiTMMart](https://twitter.com/uitmmart)
 
-this is the perfect version for now
+## 🙏 Acknowledgments
+
+- **Universiti Teknologi MARA (UiTM)** for supporting student innovation
+- **Next.js Team** for the amazing framework
+- **Stripe** for secure payment processing
+- **Tracking.my** for logistics integration
+- **Open Source Community** for the tools and libraries that made this possible
+
+---
+
+<div align="center">
+  <p>Made with ❤️ by UiTM students, for UiTM students</p>
+  <p>
+    <a href="#top">⬆️ Back to Top</a>
+  </p>
+</div>

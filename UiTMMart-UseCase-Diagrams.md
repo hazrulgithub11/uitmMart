@@ -485,3 +485,102 @@ External Systems:
 5. Multi-language Support
 
 This comprehensive use case analysis provides a complete overview of the UiTMMart system functionality organized by the three main actors: Buyer, Seller, and Admin. 
+
+## Module Flowcharts
+
+### Payment Module Flowchart
+
+```mermaid
+graph TD
+    A[Start: Initiate Checkout] --> B{Items in Cart?}
+    B -->|No| C[End: Empty Cart Error]
+    B -->|Yes| D[Group Items by Seller]
+    D --> E[Create Orders for Each Seller]
+    E --> F[Create Stripe Checkout Session]
+    F --> G{Connected Account?}
+    G -->|Yes| H[Apply Application Fee]
+    G -->|No| I[Use Platform Account]
+    H --> J[Redirect to Payment URL]
+    I --> J
+    J --> K[End: Payment Processing]
+    style A fill:#90EE90,stroke:#333,stroke-width:2px
+    style C fill:#FF6347,stroke:#333,stroke-width:2px
+    style K fill:#90EE90,stroke:#333,stroke-width:2px
+    style B shape:diamond
+    style G shape:diamond
+```
+
+### Tracking Module Flowchart
+
+```mermaid
+graph TD
+    A[Start: Enter Tracking Number] --> B[Detect Courier]
+    B --> C{Pattern Match?}
+    C -->|Yes| D[Return Courier Info]
+    C -->|No| E[Fallback to API Detection]
+    E --> F[Fetch from Tracking.my API]
+    F --> G{Valid Response?}
+    G -->|Yes| H[Update Order Status]
+    G -->|No| I[Error Handling]
+    H --> J[Store Tracking History]
+    J --> K[Notify User]
+    K --> L[End: Tracking Updated]
+    I --> L
+    style A fill:#90EE90,stroke:#333,stroke-width:2px
+    style L fill:#90EE90,stroke:#333,stroke-width:2px
+    style C shape:diamond
+    style G shape:diamond
+```
+
+### OCR and AI Module Flowchart
+
+```mermaid
+graph TD
+    A[Start: Upload Documents] --> B[Validate File Format/Size]
+    B --> C{Valid?}
+    C -->|No| D[End: Upload Error]
+    C -->|Yes| E[Process OCR with Tesseract.js]
+    E --> F[Extract Text]
+    F --> G[Send to OpenAI API for Parsing]
+    G --> H{Parse Successful?}
+    H -->|Yes| I[Store Parsed Data]
+    H -->|No| J[Error Handling]
+    I --> K[Admin Review]
+    K --> L{Approved?}
+    L -->|Yes| M[Grant Access]
+    L -->|No| N[Request Resubmission]
+    M --> O[End: Verified]
+    N --> O
+    J --> O
+    style A fill:#90EE90,stroke:#333,stroke-width:2px
+    style D fill:#FF6347,stroke:#333,stroke-width:2px
+    style O fill:#90EE90,stroke:#333,stroke-width:2px
+    style C shape:diamond
+    style H shape:diamond
+    style L shape:diamond
+```
+
+### Chat Module Flowchart
+
+```mermaid
+graph TD
+    A[Start: Initiate Chat] --> B[Authenticate User]
+    B --> C{Authenticated?}
+    C -->|No| D[End: Access Denied]
+    C -->|Yes| E[Connect to Socket.io]
+    E --> F[Join Chat Room]
+    F --> G[Send Message]
+    G --> H[Check for Duplicates]
+    H --> I{Duplicate?}
+    I -->|Yes| J[Discard Message]
+    I -->|No| K[Store in Database]
+    K --> L[Emit to Receiver]
+    L --> M[Update Read Status]
+    M --> N[End: Message Sent]
+    J --> N
+    style A fill:#90EE90,stroke:#333,stroke-width:2px
+    style D fill:#FF6347,stroke:#333,stroke-width:2px
+    style N fill:#90EE90,stroke:#333,stroke-width:2px
+    style C shape:diamond
+    style I shape:diamond
+``` 
