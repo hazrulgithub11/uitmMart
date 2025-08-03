@@ -42,6 +42,12 @@ export default function AdminPage() {
 
   const adminModules: AdminModule[] = [
     {
+      title: 'Product Analytics',
+      description: 'View product performance and sales analytics',
+      icon: <Package className="h-8 w-8 text-emerald-500" />,
+      link: '/admin/analytics'
+    },
+    {
       title: 'Tracking Configuration',
       description: 'Set up and manage tracking webhooks',
       icon: <Truck className="h-8 w-8 text-blue-500" />,
