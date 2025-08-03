@@ -29,10 +29,7 @@ export default function Home() {
             <span className="text-white font-bold text-xl">UiTMMart</span>
           </div>
           
-          {/* Centered dock navigation (desktop only) */}
-          <div className="hidden md:block absolute left-1/2 transform -translate-x-1/2">
-            <DockDemo />
-          </div>
+          
           
           {/* Login button */}
           <Link 
@@ -82,7 +79,7 @@ export default function Home() {
         <main className="container mx-auto px-4 pb-24 flex flex-col items-center justify-center text-center pt-8">
           <div className="flex flex-col sm:flex-row gap-4 mt-6">
             <Button
-              href="/shop"
+              href="/login"
               containerClassName="w-auto h-auto"
               borderClassName="bg-[radial-gradient(var(--blue-500)_40%,transparent_60%)]"
               className="rounded-full bg-blue-600 hover:bg-blue-700 border-blue-500/20 text-white px-8 py-3 text-lg font-medium transition-colors"
@@ -90,7 +87,7 @@ export default function Home() {
               Start Shopping
             </Button>
             <Link
-              href="/about"
+              href="#journey"
               className="rounded-full border border-white/20 hover:bg-white/10 text-white px-8 py-3 text-lg font-medium transition-colors"
             >
               Learn More
@@ -132,7 +129,7 @@ export default function Home() {
           {/* Project Timeline Section */}
           <div className="w-full mt-32 mb-16">
             <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-5xl font-bold mb-4">Our Journey</h2>
+              <h2 id="journey" className="text-3xl md:text-5xl font-bold mb-4">Our Journey</h2>
               <p className="text-xl text-gray-300 max-w-3xl mx-auto">
                 Follow the story of how UiTMMart came to be and our ongoing mission to serve the UiTM community.
               </p>
