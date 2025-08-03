@@ -475,12 +475,12 @@ export default function AdminProductsPage() {
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Student Buying Behavior */}
-                <div className="bg-green-50 border-2 border-green-300 rounded-lg p-4">
+                <div className="bg-green-50 border-2 border-green-300 rounded-lg p-4 text-black">
                   <h3 className="font-bold text-black mb-3 flex items-center">
                     <Users className="h-4 w-4 mr-2 text-green-500" />
                     Student Buying Behavior
                   </h3>
-                  <div className="space-y-2">
+                  <div className="space-y-2 text-black">
                     <div>
                       <span className="font-medium">Top Categories:</span>
                       <div className="flex flex-wrap gap-1 mt-1">
@@ -503,7 +503,7 @@ export default function AdminProductsPage() {
                 </div>
 
                 {/* Product Insights */}
-                <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4">
+                <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4 text-black">
                   <h3 className="font-bold text-black mb-3 flex items-center">
                     <Package className="h-4 w-4 mr-2 text-yellow-500" />
                     Product Insights
@@ -535,7 +535,7 @@ export default function AdminProductsPage() {
               </div>
 
               {/* Vendor Recommendations */}
-              <div className="bg-purple-50 border-2 border-purple-300 rounded-lg p-4">
+              <div className="bg-purple-50 border-2 border-purple-300 rounded-lg p-4 text-black">
                 <h3 className="font-bold text-black mb-3 flex items-center">
                   <Target className="h-4 w-4 mr-2 text-purple-500" />
                   Vendor Recommendations for University Events
