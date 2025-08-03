@@ -22,32 +22,33 @@ export async function GET(req: NextRequest) {
       );
     }
     
-    // Get user shop - each seller should have their own shop
-    const shop = await prisma.shop.findFirst({
-      where: { sellerId: userId },
-    });
-    
-    if (!shop) {
-      return NextResponse.json(
-        { error: "Shop not found. You must create a shop before managing products." },
-        { status: 404 }
-      );
-    }
-    
     // Get search parameters
     const url = new URL(req.url);
     const category = url.searchParams.get('category');
     const status = url.searchParams.get('status');
     const searchQuery = url.searchParams.get('search');
+    const allShops = url.searchParams.get('allShops');
     
     // Build filter based on search params
-    const whereClause: Record<string, unknown> = {
-      shopId: shop.id
-    };
+    const whereClause: Record<string, unknown> = {};
     
-    // Admins can see all products if they provide allShops=true
-    if (isAdmin && url.searchParams.get('allShops') === 'true') {
-      delete whereClause.shopId;
+    // Check if admin is requesting all shops first
+    if (isAdmin && allShops === 'true') {
+      // Admin can see all products from all shops - no shopId filter
+    } else {
+      // Regular user - get their shop
+      const shop = await prisma.shop.findFirst({
+        where: { sellerId: userId },
+      });
+      
+      if (!shop) {
+        return NextResponse.json(
+          { error: "Shop not found. You must create a shop before managing products." },
+          { status: 404 }
+        );
+      }
+      
+      whereClause.shopId = shop.id;
     }
     
     if (category && category !== 'All') {

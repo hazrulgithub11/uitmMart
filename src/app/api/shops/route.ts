@@ -3,21 +3,50 @@ import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
-// GET /api/shops - Get the current user's shop
-export async function GET() {
+// GET /api/shops - Get the current user's shop or all shops for admin
+export async function GET(req: NextRequest) {
   try {
     // Get the authenticated user
     let userId;
+    let isAdmin = false;
     
     const session = await getServerSession(authOptions);
     if (session?.user?.id) {
       userId = session.user.id;
+      
+      // Check if user is admin
+      const user = await prisma.user.findUnique({
+        where: { id: userId }
+      });
+      isAdmin = user?.role === 'admin';
     } else {
       // If not authenticated, return error
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
+    }
+    
+    // Get search parameters
+    const url = new URL(req.url);
+    const allShops = url.searchParams.get('allShops');
+    
+    // If admin requests all shops
+    if (isAdmin && allShops === 'true') {
+      const shops = await prisma.shop.findMany({
+        include: {
+          seller: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+      
+      return NextResponse.json(shops);
     }
     
     // Find the shop for this seller
