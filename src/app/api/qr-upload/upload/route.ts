@@ -7,6 +7,14 @@ import crypto from 'crypto';
 // Import the sessions map from the shared module
 import { uploadSessions } from '@/lib/qr-upload-sessions';
 
+// Type for Node.js file system errors
+interface NodeFSError extends Error {
+  code?: string;
+  errno?: number;
+  syscall?: string;
+  path?: string;
+}
+
 // Function to check if a file is an image
 function isImageFile(buffer: Buffer) {
   if (buffer.length < 4) return false;
@@ -278,10 +286,10 @@ export async function POST(request: NextRequest) {
       console.error('[QR-UPLOAD-POST] Error details:', {
         message: err instanceof Error ? err.message : 'Unknown error',
         stack: err instanceof Error ? err.stack : 'No stack trace',
-        code: (err as any)?.code,
-        errno: (err as any)?.errno,
-        syscall: (err as any)?.syscall,
-        path: (err as any)?.path,
+        code: (err as NodeFSError)?.code,
+        errno: (err as NodeFSError)?.errno,
+        syscall: (err as NodeFSError)?.syscall,
+        path: (err as NodeFSError)?.path,
         filePath,
         fileName,
         bufferSize: buffer.length,
@@ -290,17 +298,17 @@ export async function POST(request: NextRequest) {
       });
       
       // Try to provide more specific error messages
-      if ((err as any)?.code === 'ENOENT') {
+      if ((err as NodeFSError)?.code === 'ENOENT') {
         return NextResponse.json(
           { error: 'Upload directory does not exist' },
           { status: 500 }
         );
-      } else if ((err as any)?.code === 'EACCES') {
+      } else if ((err as NodeFSError)?.code === 'EACCES') {
         return NextResponse.json(
           { error: 'Permission denied writing to upload directory' },
           { status: 500 }
         );
-      } else if ((err as any)?.code === 'ENOSPC') {
+      } else if ((err as NodeFSError)?.code === 'ENOSPC') {
         return NextResponse.json(
           { error: 'No space left on device' },
           { status: 500 }

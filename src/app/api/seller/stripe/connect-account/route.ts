@@ -4,6 +4,14 @@ import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import Stripe from 'stripe';
 
+// Type for Stripe errors
+interface StripeError extends Error {
+  code?: string;
+  type?: string;
+  param?: string;
+  statusCode?: number;
+}
+
 // Check if we have a Stripe key and log a warning if not
 if (!process.env.STRIPE_SECRET_KEY) {
   console.error('STRIPE_SECRET_KEY is not defined in environment variables');
@@ -114,10 +122,11 @@ export async function POST(request: Request) {
         }
       });
       
-    } catch (stripeError: any) {
+    } catch (stripeError: unknown) {
       console.error('Error verifying Stripe account:', stripeError);
       
-      if (stripeError.code === 'resource_missing') {
+      const error = stripeError as StripeError;
+      if (error.code === 'resource_missing') {
         return NextResponse.json(
           { error: 'Stripe account not found. Please check your account ID' },
           { status: 400 }

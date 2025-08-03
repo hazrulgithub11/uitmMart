@@ -319,7 +319,7 @@ export default function SellerPaymentPage() {
                 <li>Create your Stripe account with your business information</li>
                 <li>Complete the account verification process</li>
                 <li>Once approved, go to your <a href="https://dashboard.stripe.com/settings/account" className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">Account Settings</a></li>
-                <li>Copy your Account ID (starts with "acct_")</li>
+                <li>Copy your Account ID (starts with &quot;acct_&quot;)</li>
               </ol>
             </div>
 
@@ -341,7 +341,7 @@ export default function SellerPaymentPage() {
                     disabled={connecting}
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Your Account ID should start with "acct_" and can be found in your Stripe Dashboard under Settings → Account.
+                    Your Account ID should start with &quot;acct_&quot; and can be found in your Stripe Dashboard under Settings → Account.
                   </p>
                 </div>
                 <Button 
@@ -389,7 +389,7 @@ export default function SellerPaymentPage() {
           <div>
             <h4 className="font-bold text-black">How do I find my Stripe Account ID?</h4>
             <p className="text-gray-700 mt-1">
-              After creating your Stripe account, log in to your Stripe Dashboard and go to Settings → Account. Your Account ID will be displayed there and starts with "acct_". Copy this ID to connect your account to UitmMart.
+              After creating your Stripe account, log in to your Stripe Dashboard and go to Settings → Account. Your Account ID will be displayed there and starts with &quot;acct_&quot;. Copy this ID to connect your account to UitmMart.
             </p>
           </div>
           
